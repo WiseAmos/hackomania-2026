@@ -19,23 +19,31 @@ export default function ClaimsDashboard() {
   const [platformStats, setPlatformStats] = useState<PlatformStats | null>(null)
   const [wagers, setWagers] = useState<Wager[]>([])
   const [activeTab, setActiveTab] = useState<'claims' | 'ledger' | 'submit'>('claims')
+  const [loadingDeps, setLoadingDeps] = useState(true)
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    // 1. Fetch Stats & Wagers internally for Voting Power calculation once mounted
-    const fetchDependencies = async () => {
-      try {
-        const statsRes = await fetch("/api/stats")
-        const statsData = await statsRes.json()
-        setPlatformStats(statsData)
-
-        const wagersRes = await fetch("/api/wagers")
-        const wagersData = await wagersRes.json()
-        setWagers(wagersData)
-      } catch (err) {
-        console.error("Failed to load voting dependencies", err)
+    // 1. Realtime Stats & Wagers internally for Voting Power calculation
+    const statsRef = ref(db, "pool/stats")
+    const statsUnsub = onValue(statsRef, (snapshot) => {
+      const data = snapshot.val()
+      if (data) {
+        setPlatformStats(data)
+        setLoadingDeps(false)
       }
-    }
-    fetchDependencies()
+    })
+
+    const wagersRefHandle = ref(db, "wagers")
+    const wagersUnsub = onValue(wagersRefHandle, (snapshot) => {
+      const data = snapshot.val()
+      if (data) {
+        const parsedWagers = Object.entries(data).map(([id, val]: [string, any]) => ({ id, ...val })) as Wager[]
+        setWagers(parsedWagers)
+      } else {
+        setWagers([])
+      }
+      setLoadingDeps(false)
+    })
 
     // 2. Realtime Snapshot of Claims list
     const claimsRef = ref(db, "claims")
@@ -54,7 +62,12 @@ export default function ClaimsDashboard() {
       setLoading(false)
     })
 
-    return () => unsubscribe()
+    setMounted(true)
+    return () => {
+      unsubscribe()
+      statsUnsub()
+      wagersUnsub()
+    }
   }, [])
 
   const toggleVote = async (claimId: string) => {
@@ -63,38 +76,45 @@ export default function ClaimsDashboard() {
       return
     }
 
-    if (!platformStats || !wagers) {
+    if (loadingDeps || !platformStats) {
       alert("Voting power data still loading...")
+      return
+    }
+
+    const maxVotes = calculateVotingPower(user.uid, platformStats, wagers, claims.length)
+    console.log(maxVotes);
+    const usedVotesCount = claims.filter(c => c.claim_manifest.votes?.voterIds?.includes(user.uid)).length
+    const claim = claims.find(c => c.claim_manifest.claim_id === claimId)
+    const hasVotedLocal = user && claim?.claim_manifest.votes?.voterIds?.includes(user.uid)
+
+    if (!hasVotedLocal && usedVotesCount >= maxVotes) {
+      alert(`Voting limit reached (${maxVotes} total). Unvote another claim to vote here.`)
       return
     }
 
     setVotingState((prev) => ({ ...prev, [claimId]: true }))
 
     try {
-      // Calculate Power
-      const votingPower = calculateVotingPower(user.uid, platformStats, wagers)
-      // Reference to the nested votes object inside claim manifest
       const votesRef = ref(db, `claims/${claimId}/claim_manifest/votes`)
 
       await runTransaction(votesRef, (currentVotes) => {
         if (!currentVotes) {
-          // fallback guard
-          return { count: votingPower, voterIds: [user.uid] }
+          return { count: 1, voterIds: [user.uid] }
         }
 
         const voterIds = currentVotes.voterIds || []
-        const hasVoted = voterIds.includes(user.uid)
+        const hasVotedAtomic = voterIds.includes(user.uid)
 
-        if (hasVoted) {
+        if (hasVotedAtomic) {
           // Remove Vote
           return {
-            count: Math.max(0, currentVotes.count - votingPower),
+            count: Math.max(0, (currentVotes.count || 0) - 1),
             voterIds: voterIds.filter((id: string) => id !== user.uid)
           }
         } else {
           // Add Vote
           return {
-            count: currentVotes.count + votingPower,
+            count: (currentVotes.count || 0) + 1,
             voterIds: [...voterIds, user.uid]
           }
         }
@@ -154,13 +174,13 @@ export default function ClaimsDashboard() {
             Submit New Claim
           </Link>
           <div className="h-6 w-px bg-white/10 mx-2" />
-          <button 
+          <button
             onClick={() => setActiveTab('claims')}
             className={`text-sm font-medium transition-colors ${activeTab === 'claims' ? 'text-white' : 'text-slate-500 hover:text-slate-300'}`}
           >
             Active Claims
           </button>
-          <button 
+          <button
             onClick={() => setActiveTab('ledger')}
             className={`text-sm font-medium transition-colors ${activeTab === 'ledger' ? 'text-white' : 'text-slate-500 hover:text-slate-300'}`}
           >
@@ -176,13 +196,13 @@ export default function ClaimsDashboard() {
               {activeTab === 'claims' ? 'Community Claims Review Hub' : 'Transparency Audit Ledger'}
             </h1>
             <p className="text-slate-400 max-w-xl">
-              {activeTab === 'claims' 
+              {activeTab === 'claims'
                 ? 'Review community claims requiring distributed governance. Verified tiers are automatically paid. Pending tiers require community consensus to unlock funds.'
                 : 'Full audit logs of all community fund payouts and replenishment from resolved wagers. Every cent is tracked on-chain for maximum transparency.'}
             </p>
           </div>
 
-          {user && platformStats && wagers.length > 0 && (
+          {user && platformStats && (
             <div className="bg-slate-800/50 border border-[#6366F1]/20 rounded-2xl p-4 flex items-center gap-4 backdrop-blur-sm self-start md:self-auto">
               <div className="w-12 h-12 rounded-full bg-[#6366F1]/10 flex items-center justify-center">
                 <ThumbsUp className="w-6 h-6 text-[#6366F1]" />
@@ -190,7 +210,7 @@ export default function ClaimsDashboard() {
               <div>
                 <p className="text-xs text-slate-500 uppercase tracking-wider font-bold">Available Voting Power</p>
                 <p className="text-2xl font-bold text-white leading-none">
-                  {calculateVotingPower(user.uid, platformStats, wagers)}
+                  {Math.max(0, calculateVotingPower(user.uid, platformStats, wagers, claims.length) - claims.filter(c => c.claim_manifest.votes?.voterIds?.includes(user.uid)).length)}
                 </p>
               </div>
             </div>
@@ -231,7 +251,7 @@ export default function ClaimsDashboard() {
                       </span>
                       <span className="flex items-center gap-1 text-xs text-slate-500">
                         <Clock className="w-3 h-3" />
-                        {new Date(manifest.submission_date).toLocaleDateString()}
+                        {mounted ? new Date(manifest.submission_date).toLocaleDateString() : "Loading..."}
                       </span>
                     </div>
 

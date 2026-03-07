@@ -109,7 +109,7 @@ export async function POST(req: NextRequest) {
         const tvlRef = adminDb.ref("pool/stats/totalValueLocked");
         const tvlSnap = await tvlRef.once("value");
         const currentTVL = tvlSnap.val() || 0;
-        await tvlRef.set(currentTVL + poolAmount);
+        await tvlRef.set(Math.max(0, currentTVL - (halfAmount / 100)));
 
         console.log(`[resolve] ${poolAmount} cents added to Global Fund Pool`);
 

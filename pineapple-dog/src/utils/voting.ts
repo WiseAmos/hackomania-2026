@@ -1,11 +1,10 @@
-import { Participant, PlatformStats, Wager } from '../../types/dashboard';
-
-const TOTAL_SUPPLY = 10000;
+import { PlatformStats, Wager } from '../../types/dashboard';
 
 export function calculateVotingPower(
   userId: string,
   stats: PlatformStats,
-  wagers: Wager[]
+  wagers: Wager[],
+  numClaims: number
 ): number {
   let S_i = 0;
   wagers.forEach(wager => {
@@ -16,9 +15,15 @@ export function calculateVotingPower(
     }
   });
 
-  const P = stats.totalValueLocked || 1; // Prevent division by zero
-  const C = wagers.filter(wager => wager.status === 'awaiting_auth').length;
+  const P = stats.totalValueLocked || 1;
 
-  // Formula: Vi = floor( sqrt( (Si / P) * (Total Supply / (1 + C)) ) )
-  return Math.floor(Math.sqrt((S_i / P) * (TOTAL_SUPPLY / (1 + C))));
+  // Total available votes is proportionate to the user's stake in the platform
+  // We use ceil to ensure that even small stakeholders get at least 1 vote if the ratio is positive.
+  const ratio = S_i / P;
+
+  // Voting power should be at least 1 if you have any stake and there are claims, 
+  // but capped at the total number of claims available.
+  const power = Math.ceil(ratio * numClaims);
+  console.log(Math.min(power, numClaims))
+  return Math.min(power, numClaims);
 }

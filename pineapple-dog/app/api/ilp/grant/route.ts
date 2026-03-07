@@ -45,7 +45,13 @@ export async function GET(req: NextRequest) {
     const urlObj = new URL(req.url);
     const dynamicBaseUrl = `${urlObj.protocol}//${urlObj.host}`;
 
-    // Request an interactive outgoing payment grant
+    // Request an interactive outgoing payment grant.
+    // NOTE: We intentionally do NOT set limits.debitAmount on the grant.
+    // Reason: if payment creation fails (e.g. during testing), a PENDING outgoing payment
+    // is created against the grant's debit limit. Repeated failures exhaust the limit and
+    // subsequent attempts get "403 Insufficient Grant". Instead, the exact transfer amount
+    // is controlled by the incoming payment created at resolution time, which is the
+    // correct Open Payments approach.
     const grant = await client.grant.request(
       { url: wallet.authServer },
       {
@@ -54,14 +60,7 @@ export async function GET(req: NextRequest) {
             {
               identifier: wallet.id,
               type: "outgoing-payment",
-              actions: ["read", "create"],
-              limits: {
-                debitAmount: {
-                  assetCode: "SGD",
-                  assetScale: 2,
-                  value: amount,
-                },
-              },
+              actions: ["read", "create", "list"],
             },
           ],
         },

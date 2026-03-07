@@ -175,7 +175,7 @@ export async function POST(req: NextRequest) {
           { url: loserWallet.resourceServer, accessToken: paymentToken },
           {
             walletAddress: loserWallet.id,
-            receiver: incomingPayment.id,   // ← incoming payment URL, NOT wallet address
+            receiver: incomingPayment.id,
             method: "ilp",
           }
         );
@@ -189,8 +189,29 @@ export async function POST(req: NextRequest) {
 
         totalPaidToWinner += halfAmount;
         console.log(`>>> [RESOLVE] SUCCESS: ${halfAmount}c transferred from loser to winner`);
-      } catch (err) {
-        console.error(`>>> [RESOLVE] ILP Failure (Winner Payout):`, err);
+      } catch (err: any) {
+        const errDescription = err?.description || err?.message || String(err);
+        if (errDescription === 'Insufficient Grant') {
+          console.error(
+            `>>> [RESOLVE] INSUFFICIENT GRANT for ${loserP.uid}. ` +
+            `Their grant (${gid}) was created with a debitAmount limit that has been exhausted by ` +
+            `previous PENDING payment attempts. They must re-authorize with a fresh stake grant.`
+          );
+          // Mark this grant as exhausted in Firebase so the UI can prompt re-authorization
+          await adminDb.ref(`grants/${gid}`).update({ status: "limit_exhausted" });
+          // Also clear the grantId from the participant so the UI shows the re-auth modal
+          const wagerSnap2 = await adminDb.ref(`wagers/${wagerId}`).once("value");
+          if (wagerSnap2.exists()) {
+            const wagerData2 = wagerSnap2.val();
+            const updatedParticipants = (wagerData2.participants || []).map((p: any) => {
+              if (p.uid === loserP.uid) return { ...p, grantId: "" };
+              return p;
+            });
+            await adminDb.ref(`wagers/${wagerId}`).update({ participants: updatedParticipants });
+          }
+        } else {
+          console.error(`>>> [RESOLVE] ILP Failure (Winner Payout):`, err);
+        }
       }
 
       // 3b. Record pool refill (50%)

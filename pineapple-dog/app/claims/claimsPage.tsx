@@ -203,37 +203,6 @@ export default function ClaimsClientPage(
                   )}
                 </div>
               )}
-              {step === 3 && (
-                <div className={s.analyseEvidence}>
-                  <h2 className={s.header}>Score</h2>
-                  <div className={s.scores}>
-                    <div className={s.score}>
-                      <div className={s.scoreHeader}>Records Analysis</div>
-                      <div className={s.scoreBox}>
-                        <div className={s.scoreText}>
-                          {recordAnalysis}
-                        </div>
-                      </div>
-                    </div>
-                    <div className={s.score}>
-                      <div className={s.scoreHeader}>GPS Data</div>
-                      <div className={s.scoreBox}>
-                        <div className={s.scoreText}>
-                          {recordAnalysis}
-                        </div>
-                      </div>
-                    </div>
-                    <div className={s.score}>
-                      <div className={s.scoreHeader}>Business Registry</div>
-                      <div className={s.scoreBox}>
-                        <div className={s.scoreText}>
-                          {businessAnalysis}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
 
         {step === 4 && (
@@ -247,6 +216,68 @@ export default function ClaimsClientPage(
               </div>
             ) : verificationResult ? (
               <div className={s.resultsLayout}>
+                {verificationResult.validator_data && (
+                  <>
+                    <h3 style={{ color: verificationResult.validator_data.verification_anchor.disaster_verified ? '#10B981' : '#EF4444', marginBottom: '0.5rem' }}>
+                      {verificationResult.validator_data.verification_anchor.disaster_verified ? '✓ Disaster Verified' : '❌ Disaster Not Found'}
+                    </h3>
+                    <div className={s.scores}>
+                      <div className={s.score}>
+                        <div className={s.scoreHeader}>IoT Sensors<br/>(Weather/Seismic)</div>
+                        <div className={s.scoreBox} style={{ borderColor: verificationResult.validator_data.verification_anchor.data_sources.iot_sensor_match === 'PASS' ? '#10B981' : '#EF4444' }}>
+                          <div className={s.scoreText}>
+                            {verificationResult.validator_data.verification_anchor.data_sources.iot_sensor_match}
+                          </div>
+                        </div>
+                      </div>
+                      <div className={s.score}>
+                        <div className={s.scoreHeader}>News<br/>Reports</div>
+                        <div className={s.scoreBox}>
+                          <div className={s.scoreText}>
+                            {verificationResult.validator_data.verification_anchor.data_sources.news_reports_found}
+                          </div>
+                        </div>
+                      </div>
+                      <div className={s.score}>
+                        <div className={s.scoreHeader}>Oracle<br/>Consensus</div>
+                        <div className={s.scoreBox} style={{ borderColor: verificationResult.validator_data.verification_anchor.data_sources.oracle_consensus >= 50 ? '#10B981' : '#EF4444' }}>
+                          <div className={s.scoreText}>
+                            {verificationResult.validator_data.verification_anchor.data_sources.oracle_consensus}%
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    {/* Legacy UI Verification Boxes */}
+                    {verificationResult.calculated_score > 0 && (
+                      <div className={s.scores}>
+                        <div className={s.score}>
+                          <div className={s.scoreHeader}>Records Analysis</div>
+                          <div className={s.scoreBox}>
+                            <div className={s.scoreText}>
+                              {recordAnalysis}
+                            </div>
+                          </div>
+                        </div>
+                        <div className={s.score}>
+                          <div className={s.scoreHeader}>GPS Data</div>
+                          <div className={s.scoreBox}>
+                            <div className={s.scoreText}>
+                              {recordAnalysis}
+                            </div>
+                          </div>
+                        </div>
+                        <div className={s.score}>
+                          <div className={s.scoreHeader}>Business Registry</div>
+                          <div className={s.scoreBox}>
+                            <div className={s.scoreText}>
+                              {businessAnalysis}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
                 <div className={s.scoreCircle}>
                   <div className={s.scoreVal}>{verificationResult.calculated_score}</div>
                   <div className={s.scoreLabel}>AI Confidence</div>

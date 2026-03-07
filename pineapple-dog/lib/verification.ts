@@ -32,6 +32,24 @@ export interface ClaimManifest {
   votes: { count: number; voterIds: string[] };
 }
 
+export interface ValidatorResults {
+  verification_anchor: {
+    disaster_verified: boolean;
+    confidence_score: number;
+    data_sources: {
+      iot_sensor_match: "PASS" | "FAIL" | "DELAYED";
+      news_reports_found: number;
+      oracle_consensus: number;
+    };
+  };
+  event_details: {
+    event_type: string;
+    verified_timestamp: string;
+    impact_radius_km: number;
+  };
+  issue_explanation: string;
+}
+
 export interface VerificationResults {
   calculated_score: number;
   triage_tier: number;
@@ -40,6 +58,7 @@ export interface VerificationResults {
     status: string;
   };
   analysis_explanation: string;
+  validator_data?: ValidatorResults;
 }
 
 export interface UnifiedResponse {
@@ -67,9 +86,26 @@ export class PDLEngine {
       manifest.votes = { count: 0, voterIds: [] };
     }
 
-    let result;
+    let result: VerificationResults;
     try {
-      result = await this.getAIAssessment(manifest);
+      // Step 1: Validate Disaster Anchor
+      const validation = await this.getDisasterValidation(manifest.disaster_info);
+
+      if (!validation.verification_anchor.disaster_verified) {
+        console.warn(`[PDL-Engine] Disaster validation failed for ${manifest.claim_id}: No active event found.`);
+        result = {
+          calculated_score: 0,
+          triage_tier: 3,
+          disbursement: { payout_percentage: 0, status: "EVENT_NOT_FOUND" },
+          analysis_explanation: "Claim automatically rejected. Environmental IoT data and Real-Time News streams could not verify the existence of an active disaster at the specified location and time.",
+          validator_data: validation
+        };
+      } else {
+        // Step 2: Score Individual Claim
+        result = await this.getAIAssessment(manifest);
+        // Attach the successful validation data to the final result
+        result.validator_data = validation;
+      }
     } catch (e) {
       console.warn("AI Assessment failing, falling back to basic logic:", e);
       result = this.basicScoreFallback();
@@ -111,6 +147,63 @@ export class PDLEngine {
       },
       analysis_explanation: "AI assessment failed. Falling back to manual review."
     };
+  }
+
+  private async getDisasterValidation(disasterInfo: ClaimManifest["disaster_info"]): Promise<ValidatorResults> {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey || apiKey === "MOCK_KEY" || apiKey === "") {
+      throw new Error("Missing API Key");
+    }
+
+    const model = this.genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+    const prompt = `
+Role: You are the PDL-Validator, a specialized AI agent designed to verify the real-world existence of natural disasters by cross-referencing Environmental IoT data with Real-Time News streams.
+
+Task: Before processing any individual claim, you must verify the "Disaster Anchor." If the anchor is not verified, the claim is automatically rejected for "No Active Event."
+
+Step 1: The Physical Anchor (IoT Sensor Check)
+Query Environmental Oracles: Use live data from NEA (Rainfall/Wind), PUB (Flood Alerts), or USGS (Seismic).
+Identify Anomalies: Confirm if physical thresholds (e.g., rainfall > 50mm/hr or earthquake magnitude > 4.5) were met at the coordinates provided in the claim.
+
+Step 2: The Social Anchor (News Cross-Reference)
+Query News APIs: Search GDELT, NewsData.io, or Google News for keywords (e.g., "flood," "emergency," "evacuation") within a 10km radius of the user's location.
+Event Clustering: Confirm that multiple independent reports exist for the same event to filter out localized noise or misinformation.
+
+Step 3: Consensus Scoring
+- Physical + Social Match (+70 points): Sensor and News both confirm an active event.
+- Physical Only (+40 points): Sensor confirms anomaly, but news is quiet (possible false alarm or hyper-local event).
+- Social Only (+20 points): News reports event, but no sensor anomaly detected (possible delay or misinformation).
+
+Step 4: The Output
+Return a disaster_verified boolean. If true (score >= 40), pass the claim. If false, terminate.
+
+OUTPUT FORMAT (JSON ONLY):
+{
+  "verification_anchor": {
+    "disaster_verified": boolean,
+    "confidence_score": number,
+    "data_sources": {
+      "iot_sensor_match": "PASS" | "FAIL" | "DELAYED",
+      "news_reports_found": number,
+      "oracle_consensus": number
+    }
+  },
+  "event_details": {
+    "event_type": string,
+    "verified_timestamp": string,
+    "impact_radius_km": number
+  }
+}
+
+INPUT DATA:
+${JSON.stringify(disasterInfo, null, 2)}
+    `;
+
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
+    const jsonStr = text.replace(/```json|```/g, "").trim();
+    console.log("[PDL-Validator] Validation Result:", jsonStr);
+    return JSON.parse(jsonStr);
   }
 
   private async getAIAssessment(manifest: ClaimManifest): Promise<VerificationResults> {

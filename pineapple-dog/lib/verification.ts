@@ -155,7 +155,7 @@ export class PDLEngine {
       throw new Error("Missing API Key");
     }
 
-    const model = this.genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = this.genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
     const prompt = `
 Role: You are the PDL-Validator, a specialized AI agent designed to verify the real-world existence of natural disasters and significant public incidents.
 
@@ -199,7 +199,7 @@ ${JSON.stringify(disasterInfo, null, 2)}
       throw new Error("[PDL-Engine] AI Assessment requires a valid GEMINI_API_KEY. Mocking is disabled per user request.");
     }
 
-    const model = this.genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = this.genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
     
     // Create a sanitized copy of the manifest to avoid sending large base64 strings
     const { category_details, ...manifestWithoutDetails } = manifest;

@@ -8,7 +8,6 @@ import { ref, onValue, runTransaction } from "firebase/database"
 import { ClaimManifest, UnifiedResponse } from "../../lib/verification"
 import { calculateVotingPower } from "../../src/utils/voting"
 import { PlatformStats, Wager } from "../../types/dashboard"
-import ClaimsClientPage from "./claimsPage"
 import TransactionLedger from "../../components/claims/TransactionLedger"
 
 export default function ClaimsDashboard() {

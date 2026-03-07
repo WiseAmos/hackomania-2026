@@ -91,12 +91,15 @@ export default function ClaimsClientPage(
   const [amount, setAmount] = useState("50");
   const [description, setDescription] = useState("");
 
+  const recordAnalysis = "Analysis Pending";
+  const businessAnalysis = "Analysis Pending";
+
   const { user } = useAuth();
 
   async function handleSubmit() {
     if (!user) return;
     setIsSubmitting(true);
-    setStep(3);
+    setStep(4);
 
     try {
       const res = await fetch("/api/claims", {
@@ -136,72 +139,20 @@ export default function ClaimsClientPage(
   }
 
   return (
-    <div className={s.claimsPage}>
-      <h1>Submit a claim</h1>
-      <div className={s.stepFrame}>
-        {step === 0 && 
-          <div className={s.activeDisaster}>
-            <h2 className={s.header}>Select active disaster</h2>
-            <div className={s.disasterList}>
-              {currentDisasters.map((d) => <div key={d} onClick={() => setDisaster(d)} className={s.listItem}>{d}</div>)}
-            </div>
-          </div>
-        }
-        {step === 1 && 
-          <div className={s.impactType}>
-            <h2 className={s.header}>Choose Impact Type</h2>
-            <div className={s.impactList}>
-              <div onClick={() => setImpact("property")} className={s.impactItem}>
-                <House />
-                Property
-              </div>
-              <div onClick={() => setImpact("presence")} className={s.impactItem}>
-                <Locate />
-                Presence
-              </div>
-              <div onClick={() => setImpact("livelihood")} className={s.impactItem}>
-                <BriefcaseBusiness />
-                Livelihood
-              </div>
-            </div>
-            <div className={s.amountInput}>
-              <label>Amount Requested ($)</label>
-              <input 
-                type="number" 
-                value={amount} 
-                onChange={(e) => setAmount(e.target.value)} 
-                className={s.inputField}
-              />
-            </div>
-            <div className={s.descInput}>
-              <label>Description of impact</label>
-              <textarea 
-                value={description} 
-                onChange={(e) => setDescription(e.target.value)} 
-                className={s.textField}
-                placeholder="Describe how you were affected..."
-              />
-            </div>
-          </div>
-        }
-        {step === 2 && (
-          <div className={s.uploadEvidence}>
-            <h2 className={s.header}>Upload Evidence</h2>
-
-        {/* Nav */}
-        <nav className="w-full flex justify-between items-center py-6 px-6 md:px-10 border-b border-white/5 bg-slate-900/80 backdrop-blur-xl sticky top-0 z-50">
-            <Link
-                href="/dashboard"
-                className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
-            >
-                <ArrowLeft className="w-4 h-4" />
-                <span className="text-sm font-medium">Back to Dashboard</span>
-            </Link>
-
-        </nav>
-        <div className={s.modal}>
-          <div className={s.claimsPage}>
-            <h1 className={s.title}>Submit a claim</h1>
+    <>
+      {/* Nav */}
+      <nav className="w-full flex justify-between items-center py-6 px-6 md:px-10 border-b border-white/5 bg-slate-900/80 backdrop-blur-xl sticky top-0 z-50">
+          <Link
+              href="/dashboard"
+              className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
+          >
+              <ArrowLeft className="w-4 h-4" />
+              <span className="text-sm font-medium">Back to Dashboard</span>
+          </Link>
+      </nav>
+      <div className={s.modal}>
+        <div className={s.claimsPage}>
+          <h1 className={s.title}>Submit a claim</h1>
             <div className={s.stepFrame}>
               {step === 0 && 
                 <div className={s.activeDisaster}>
@@ -285,15 +236,7 @@ export default function ClaimsClientPage(
               )}
             </div>
 
-            {image && (
-              <div className={s.preview}>
-                <h3>Preview</h3>
-                <img src={image} alt="evidence" className={s.previewImage} />
-              </div>
-            )}
-          </div>
-        )}
-        {step === 3 && (
+        {step === 4 && (
           <div className={s.analyseEvidence}>
             <h2 className={s.header}>{isSubmitting ? "Verifying Claim..." : "Verification Result"}</h2>
             
@@ -349,7 +292,6 @@ export default function ClaimsClientPage(
             )}
           </div>
         )}
-      </div>
       <div className={s.buttonBox}>
         {step < 3 && (
           <>
@@ -377,6 +319,8 @@ export default function ClaimsClientPage(
         )}
       </div>
     </div>
+  </div>
+  </>
   )
 }
 

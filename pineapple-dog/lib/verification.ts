@@ -1,7 +1,13 @@
 export interface ClaimManifest {
   claim_id: string;
   submission_date: string;
-  disaster_event_id: string;
+  disaster_info: {
+    name: string;
+    date: string;
+    time?: string;
+    details: string;
+    location?: string;
+  };
   title: string;
   description: string;
   amount_requested: number;
@@ -32,6 +38,7 @@ export interface VerificationResults {
     payout_percentage: number;
     status: string;
   };
+  analysis_explanation: string;
 }
 
 export interface UnifiedResponse {
@@ -80,11 +87,11 @@ export class PDLEngine {
   private async saveTokenToDb(response: UnifiedResponse) {
     const claimId = response.claim_manifest.claim_id;
     const claimRef = adminDb.ref(`claims/${claimId}`);
-    await claimRef.set({
+    await claimRef.update({
       ...response,
       updated_at: new Date().toISOString()
     });
-    console.log(`[PDL-Engine] Claim ${claimId} persisted to database.`);
+    console.log(`[PDL-Engine] Claim ${claimId} verified and updated in database.`);
   }
 
   private basicScoreFallback(): VerificationResults {
@@ -95,7 +102,8 @@ export class PDLEngine {
       disbursement: {
         payout_percentage: 0,
         status: "PENDING_HUMAN_REVIEW"
-      }
+      },
+      analysis_explanation: "AI assessment failed. Falling back to manual review."
     };
   }
 
@@ -116,8 +124,8 @@ SCORING GUIDELINES (Total Max 100):
 You must evaluate each section on a scale from 0 to its maximum value based on the evidence provided. Do NOT use binary (all-or-nothing) scores unless the evidence is absolute.
 
 1. Disaster Confirmation (Max 40):
-   - Score based on how well the disaster_event_id and description match regional events. 
-   - A verified event ID (e.g. SG-FLOOD prefix) starts at 30+ points. 
+   - Score based on how well the disaster_info (name, date, time, details, location) matches known historical or real-time event patterns.
+   - High scores for specific, consistent details that align with the provided disaster type.
    - Graded based on timing and description accuracy.
 
 2. Identity & Account Standing (Max 20):
@@ -148,7 +156,8 @@ OUTPUT FORMAT (JSON ONLY):
   "disbursement": {
     "payout_percentage": number,
     "status": "DISBURSED" | "PARTIAL_DISBURSED" | "PENDING_HUMAN_REVIEW"
-  }
+  },
+  "analysis_explanation": "A detailed 2-3 sentence explanation of why this score was given, citing specific evidence from the manifest."
 }
 
 INPUT DATA:

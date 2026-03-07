@@ -3,6 +3,8 @@ import { useCallback, useEffect, useState } from "react"
 import s from "./claimsPage.module.css"
 import { BriefcaseBusiness, House, Locate } from 'lucide-react';
 import { useDropzone } from "react-dropzone"
+import { useAuth } from "@/lib/AuthContext"
+import Link from "next/link"
 
 export default function ClaimsClientPage(
   {currentDisasters} : 
@@ -83,9 +85,56 @@ export default function ClaimsClientPage(
     maxFiles: 1
   })
 
-  const recordAnalysis = 0.27
-  const gpsAnalysis = 0.27
-  const businessAnalysis = 0.27
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [verificationResult, setVerificationResult] = useState<any>(null);
+  const [showRaw, setShowRaw] = useState(false);
+  const [amount, setAmount] = useState("50");
+  const [description, setDescription] = useState("");
+
+  const { user } = useAuth();
+
+  async function handleSubmit() {
+    if (!user) return;
+    setIsSubmitting(true);
+    setStep(3);
+
+    try {
+      const res = await fetch("/api/claims", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user.uid,
+          amount,
+          description,
+          reliefFund: disaster,
+          wagerTitle: "Community Relief Claim",
+          claimantWallet: user.walletAddress || "test.wallet.near",
+          disaster_info: {
+            name: disaster,
+            date: new Date().toISOString().split('T')[0],
+            details: description,
+            location: "Singapore"
+          },
+          selected_category: impact?.toUpperCase(),
+          category_details: {
+            [impact || "other"]: {
+              geotagged_media: image,
+              evidence_url: image
+            }
+          }
+        })
+      });
+
+      const data = await res.json();
+      if (data.verification) {
+        setVerificationResult(data.verification.verification_results);
+      }
+    } catch (err) {
+      console.error("Submission failed:", err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
 
   return (
     <div className={s.claimsPage}>
@@ -116,6 +165,24 @@ export default function ClaimsClientPage(
                 Livelihood
               </div>
             </div>
+            <div className={s.amountInput}>
+              <label>Amount Requested ($)</label>
+              <input 
+                type="number" 
+                value={amount} 
+                onChange={(e) => setAmount(e.target.value)} 
+                className={s.inputField}
+              />
+            </div>
+            <div className={s.descInput}>
+              <label>Description of impact</label>
+              <textarea 
+                value={description} 
+                onChange={(e) => setDescription(e.target.value)} 
+                className={s.textField}
+                placeholder="Describe how you were affected..."
+              />
+            </div>
           </div>
         }
         {step === 2 && (
@@ -142,43 +209,86 @@ export default function ClaimsClientPage(
         )}
         {step === 3 && (
           <div className={s.analyseEvidence}>
-            <h2 className={s.header}>Score</h2>
-            <div className={s.scores}>
-              <div className={s.score}>
-                <div className={s.scoreHeader}>Records Analysis</div>
-                <div className={s.scoreBox}>
-                  <div className={s.scoreText}>
-                    {recordAnalysis}
+            <h2 className={s.header}>{isSubmitting ? "Verifying Claim..." : "Verification Result"}</h2>
+            
+            {isSubmitting ? (
+              <div className={s.loadingContainer}>
+                <div className={s.spinner}></div>
+                <p>Gemini AI is auditing your claim manifest...</p>
+              </div>
+            ) : verificationResult ? (
+              <div className={s.resultsLayout}>
+                <div className={s.scoreCircle}>
+                  <div className={s.scoreVal}>{verificationResult.calculated_score}</div>
+                  <div className={s.scoreLabel}>AI Confidence</div>
+                </div>
+                
+                <div className={s.resultsDetails}>
+                  <div className={s.resultRow}>
+                    <span>Triage Tier:</span>
+                    <span className={s.resultVal}>Tier {verificationResult.triage_tier}</span>
+                  </div>
+                  <div className={s.resultRow}>
+                    <span>Status:</span>
+                    <span className={s.resultVal}>{verificationResult.disbursement.status}</span>
+                  </div>
+                  <div className={s.resultRow}>
+                    <span>Payout:</span>
+                    <span className={s.resultVal}>{verificationResult.disbursement.payout_percentage}%</span>
                   </div>
                 </div>
-              </div>
-              <div className={s.score}>
-                <div className={s.scoreHeader}>GPS Data</div>
-                <div className={s.scoreBox}>
-                  <div className={s.scoreText}>
-                    {recordAnalysis}
+
+                <div className={s.aiAnalysis}>
+                  <h3>AI Analysis Explanation</h3>
+                  <div className={s.analysisText}>
+                    {verificationResult.analysis_explanation}
                   </div>
                 </div>
-              </div>
-              <div className={s.score}>
-                <div className={s.scoreHeader}>Business Registry</div>
-                <div className={s.scoreBox}>
-                  <div className={s.scoreText}>
-                    {businessAnalysis}
-                  </div>
+
+                <div className={s.actionBox}>
+                  <Link href="/dashboard" className="button-solid">Back to Portfolio</Link>
+                  <button onClick={() => setShowRaw(!showRaw)} className={s.toggleRaw}>
+                    {showRaw ? "Hide Raw AI Output" : "Show Raw AI Output"}
+                  </button>
                 </div>
+
+                {showRaw && (
+                  <div className={s.rawOutput}>
+                    <pre>{JSON.stringify(verificationResult, null, 2)}</pre>
+                  </div>
+                )}
               </div>
-            </div>
+            ) : (
+              <p>Failed to retrieve verification result. Please check your dashboard.</p>
+            )}
           </div>
         )}
       </div>
       <div className={s.buttonBox}>
-        <button onClick={decrementStep} className="button-solid">
-          Previous
-        </button>
-        <button onClick={incrementStep} className="button-solid">
-          Next
-        </button>
+        {step < 3 && (
+          <>
+            <button onClick={decrementStep} className="button-solid">
+              Previous
+            </button>
+            {step === 2 ? (
+              <button 
+                onClick={handleSubmit} 
+                className="button-solid" 
+                disabled={!image || isSubmitting}
+              >
+                {isSubmitting ? "Submitting..." : "Submit Claim"}
+              </button>
+            ) : (
+              <button 
+                onClick={incrementStep} 
+                className="button-solid" 
+                disabled={step === 0 && !disaster || step === 1 && !impact}
+              >
+                Next
+              </button>
+            )}
+          </>
+        )}
       </div>
     </div>
   )

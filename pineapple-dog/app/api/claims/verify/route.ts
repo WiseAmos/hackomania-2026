@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PDLEngine, ClaimManifest } from "@/lib/pdl-engine";
+import { PDLEngine, ClaimManifest } from "@/lib/verification";
 
 export async function POST(req: NextRequest) {
   try {

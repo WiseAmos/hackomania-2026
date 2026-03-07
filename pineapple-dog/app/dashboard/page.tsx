@@ -120,10 +120,6 @@ export default function ArenaDashboardLayout() {
               {user.walletAddress ? "Connected" : "No Wallet"}
             </span>
           </div>
-          <Link href="/profile" className="hidden md:flex items-center gap-2 bg-slate-800/50 hover:bg-slate-800 text-white/70 hover:text-white px-4 py-2.5 rounded-full font-bold text-xs sm:text-sm transition-all border border-white/5">
-            <User className="w-4 h-4" />
-            Profile & KYC
-          </Link>
           <Link href="/wager" className="bg-[#6366F1] hover:bg-[#4F46E5] text-white px-4 sm:px-5 py-2.5 rounded-full font-[family-name:var(--font-heading)] font-bold text-xs sm:text-sm flex items-center gap-2 transition-all shadow-[0_0_24px_rgba(99,102,241,0.4)] hover:-translate-y-0.5 active:scale-95 whitespace-nowrap">
             <Plus className="w-4 h-4" />
             New Showdown

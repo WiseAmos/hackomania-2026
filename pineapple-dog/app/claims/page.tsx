@@ -1,4 +1,4 @@
-import ClaimsClientPage from "./ClaimsPage"
+import ClaimsClientPage from "./claimsPage"
 
 
 export default function claimsPage() {

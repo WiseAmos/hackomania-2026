@@ -204,17 +204,20 @@ export default function ClaimsClientPage() {
               <div className="flex flex-col gap-4">
                 <h2 className="text-xl font-bold text-[#6366F1] mb-2">Choose Impact Type</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div onClick={() => setImpact("property")} className={`flex flex-col items-center justify-center gap-3 p-6 rounded-xl cursor-pointer transition-all border ${impact === "property" ? "bg-[#6366F1]/20 border-[#6366F1] text-white" : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10 hover:text-white"}`}>
-                    <House className="w-8 h-8" />
-                    <span className="font-medium">Property</span>
+                  <div onClick={() => setImpact("property")} className={`flex flex-col items-center text-center justify-center gap-2 p-6 rounded-xl cursor-pointer transition-all border ${impact === "property" ? "bg-[#6366F1]/20 border-[#6366F1] text-white" : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10 hover:text-white"}`}>
+                    <House className="w-8 h-8 mb-1" />
+                    <span className="font-bold">Property</span>
+                    <span className="text-xs text-slate-400">Damage to your registered home or real estate.</span>
                   </div>
-                  <div onClick={() => setImpact("presence")} className={`flex flex-col items-center justify-center gap-3 p-6 rounded-xl cursor-pointer transition-all border ${impact === "presence" ? "bg-[#6366F1]/20 border-[#6366F1] text-white" : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10 hover:text-white"}`}>
-                    <Locate className="w-8 h-8" />
-                    <span className="font-medium">Presence</span>
+                  <div onClick={() => setImpact("presence")} className={`flex flex-col items-center text-center justify-center gap-2 p-6 rounded-xl cursor-pointer transition-all border ${impact === "presence" ? "bg-[#6366F1]/20 border-[#6366F1] text-white" : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10 hover:text-white"}`}>
+                    <Locate className="w-8 h-8 mb-1" />
+                    <span className="font-bold">Presence</span>
+                    <span className="text-xs text-slate-400">Evacuation or stranding verified by device logs.</span>
                   </div>
-                  <div onClick={() => setImpact("livelihood")} className={`flex flex-col items-center justify-center gap-3 p-6 rounded-xl cursor-pointer transition-all border ${impact === "livelihood" ? "bg-[#6366F1]/20 border-[#6366F1] text-white" : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10 hover:text-white"}`}>
-                    <BriefcaseBusiness className="w-8 h-8" />
-                    <span className="font-medium">Livelihood</span>
+                  <div onClick={() => setImpact("livelihood")} className={`flex flex-col items-center text-center justify-center gap-2 p-6 rounded-xl cursor-pointer transition-all border ${impact === "livelihood" ? "bg-[#6366F1]/20 border-[#6366F1] text-white" : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10 hover:text-white"}`}>
+                    <BriefcaseBusiness className="w-8 h-8 mb-1" />
+                    <span className="font-bold">Livelihood</span>
+                    <span className="text-xs text-slate-400">Business interruption and verifiable income loss.</span>
                   </div>
                 </div>
               </div>

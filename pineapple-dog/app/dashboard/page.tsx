@@ -222,10 +222,6 @@ export default function ArenaDashboardLayout() {
             <Users className="w-4 h-4" />
             Friends
           </button>
-          <Link href="/profile" className="hidden md:flex items-center gap-2 bg-slate-800/50 hover:bg-slate-800 text-white/70 hover:text-white px-4 py-2.5 rounded-full font-bold text-xs sm:text-sm transition-all border border-white/5">
-            <User className="w-4 h-4" />
-            Profile & KYC
-          </Link>
           <Link href="/claims" className="hidden lg:flex bg-slate-800 hover:bg-slate-700 text-white/90 px-4 sm:px-5 py-2.5 rounded-full font-[family-name:var(--font-heading)] font-bold text-xs sm:text-sm items-center gap-2 transition-all border border-white/5 whitespace-nowrap">
             <Award className="w-4 h-4" />
             Review Claims

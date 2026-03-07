@@ -99,7 +99,7 @@ export async function POST(req: NextRequest) {
                 // Update TVL in stats
                 const tvlRef = adminDb.ref("pool/stats/totalValueLocked");
                 const tvlSnap = await tvlRef.once("value");
-                await tvlRef.set(Math.max(0, (tvlSnap.val() || 0) - payAmount));
+                await tvlRef.set(Math.max(0, (tvlSnap.val() || 0) - (payAmount / 100)));
 
                 payments.push({ grantId: poolEntry.id, amountPaid: payAmount });
                 remaining -= payAmount;

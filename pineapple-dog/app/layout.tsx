@@ -25,7 +25,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${spaceGrotesk.variable} ${inter.variable}`}>
+      <body className={`${spaceGrotesk.variable} ${inter.variable}`} suppressHydrationWarning>
         <AuthProvider>
           {children}
         </AuthProvider>

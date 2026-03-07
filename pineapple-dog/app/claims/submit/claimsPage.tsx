@@ -1,58 +1,70 @@
 "use client"
 import { useCallback, useEffect, useState } from "react"
 import s from "./claimsPage.module.css"
-import { ArrowLeft, BriefcaseBusiness, House, Locate, Upload, Loader2 } from 'lucide-react';
-import { useDropzone } from "react-dropzone"
+import { ArrowLeft, BriefcaseBusiness, House, Locate, Loader2 } from 'lucide-react';
 import Link from "next/link";
 import { useAuth } from "@/lib/AuthContext"
 
-export default function ClaimsClientPage(
-  { currentDisasters }:
-    { currentDisasters: string[] }
-) {
+export default function ClaimsClientPage() {
   const [step, setStep] = useState(0);
   /* 
-  step 0: select disaster
+  step 0: Claim details
   step 1: choose impact type
-  step 2: upload evidence
+  step 2: category verification details
   step 3: analyse evidence
   */
-  const MAX_STEP = 3
+  const MAX_STEP = 2;
 
-  const [disaster, setDisaster] = useState<null | string>(null);
   const [impact, setImpact] = useState<null | string>(null);
-  const [gps, setGPS] = useState<null | string>(null);
-  const [image, setImage] = useState<null | string>(null);
 
+  type FormData = {
+    title: string;
+    description: string;
+    amount: number;
+    disasterDate: string;
+    disasterTime: string;
+    disasterLocation: string;
+    disasterDetails: string;
+    homeAddress: string;
+    businessUen: string;
+    businessSector: string;
+  };
 
-  function selectDisaster(d: string) {
-    setDisaster(d);
+  const [formData, setFormData] = useState<FormData>({
+    title: "",
+    description: "",
+    amount: 50,
+    disasterDate: new Date().toISOString().split('T')[0],
+    disasterTime: "",
+    disasterLocation: "",
+    disasterDetails: "",
+    homeAddress: "",
+    businessUen: "",
+    businessSector: ""
+  });
+
+  function updateForm(field: keyof FormData, value: string | number) {
+    setFormData(prev => ({ ...prev, [field]: value }));
   }
 
   function decrementStep() {
-    if (step >= 1) {
-      setStep(prev => prev - 1);
-    }
+    if (step >= 1) setStep(prev => prev - 1);
   }
 
   function incrementStep() {
-    if (step < MAX_STEP) {
-      setStep(prev => prev + 1);
-    }
+    if (step < MAX_STEP) setStep(prev => prev + 1);
   }
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [verificationResult, setVerificationResult] = useState<any>(null);
   const [showRaw, setShowRaw] = useState(false);
-  const [amount, setAmount] = useState("50");
-  const [description, setDescription] = useState("");
 
   const { user } = useAuth();
 
   async function handleSubmit() {
     if (!user) return;
     setIsSubmitting(true);
-    setStep(4);
+    setStep(3);
 
     try {
       const res = await fetch("/api/claims", {
@@ -60,23 +72,24 @@ export default function ClaimsClientPage(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId: user.uid,
-          amount,
-          description,
-          reliefFund: disaster,
-          wagerTitle: "Community Relief Claim",
+          amount: formData.amount,
+          description: formData.description,
+          reliefFund: formData.title || "Community Relief Claim",
+          wagerTitle: formData.title || "Community Relief Claim",
           claimantWallet: user.walletAddress || "test.wallet.near",
           disaster_info: {
-            name: disaster,
-            date: new Date().toISOString().split('T')[0],
-            details: description,
-            location: "Singapore"
+            name: formData.title || "Unknown Incident",
+            date: formData.disasterDate,
+            time: formData.disasterTime,
+            location: formData.disasterLocation,
+            details: formData.disasterDetails
           },
           selected_category: impact?.toUpperCase(),
           category_details: {
-            [impact || "other"]: {
-              // Image data excluded per user request to save tokens
-            }
-          }
+            property: impact === "property" ? { home_address: formData.homeAddress, registry_match: true } : undefined,
+            presence: impact === "presence" ? { gps_location_logs: [], telecom_tower_data: "matched" } : undefined,
+            livelihood: impact === "livelihood" ? { business_uen: formData.businessUen, sector: formData.businessSector } : undefined,
+          },
         })
       });
 
@@ -92,48 +105,8 @@ export default function ClaimsClientPage(
   }
 
   useEffect(() => {
-    if (disaster && step == 0) {
-      setStep(1);
-    }
-  }, [disaster])
-
-  useEffect(() => {
-    if (impact && step == 1) {
-      setStep(2);
-    }
   }, [impact])
 
-  function fileToBase64(file: File): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader()
-
-      reader.readAsDataURL(file)
-
-      reader.onload = () => resolve(reader.result as string)
-      reader.onerror = error => reject(error)
-    })
-  }
-
-  const onDrop = useCallback(async (acceptedFiles: File[]) => {
-    if (acceptedFiles.length === 0) return
-
-    const base64 = await fileToBase64(acceptedFiles[0])
-    setImage(base64)
-  }, [])
-
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: {
-      "image/*": []
-    },
-    maxFiles: 1
-  })
-
-  // Mock scoring initially
-  const recordAnalysis = 0.27
-  const gpsAnalysis = 0.27
-  const businessAnalysis = 0.27
-  const totalScore = 0.27
 
   return (
     <main className="min-h-screen bg-slate-900 relative font-sans text-slate-100 selection:bg-[#6366F1]/30 pb-20">
@@ -156,21 +129,40 @@ export default function ClaimsClientPage(
           <h1 className="text-3xl font-bold font-[family-name:var(--font-heading)] text-white mb-8 text-center">Submit a claim</h1>
           <div className="flex flex-col gap-6 min-h-[300px]">
             {step === 0 &&
-              <div className="flex flex-col gap-4">
-                <h2 className="text-xl font-bold text-[#6366F1] mb-2">Select active disaster ({currentDisasters.length} results)</h2>
-                <div className="flex flex-col gap-3">
-                  {currentDisasters.map((d) => (
-                    <div
-                      key={d}
-                      onClick={() => setDisaster(d)}
-                      className={`p-4 rounded-xl cursor-pointer transition-all border ${disaster === d
-                          ? "bg-[#6366F1]/20 border-[#6366F1] text-white shadow-[0_0_15px_rgba(99,102,241,0.2)]"
-                          : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10 hover:text-white"
-                        }`}
-                    >
-                      {d}
-                    </div>
-                  ))}
+              <div className="flex flex-col gap-5">
+                <h2 className="text-xl font-bold text-[#6366F1] mb-2">Claim &amp; Disaster Details</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-bold text-slate-400 pl-1 uppercase tracking-wider">Claim Title</label>
+                    <input type="text" value={formData.title} onChange={e => updateForm("title", e.target.value)} placeholder="e.g., Flash Flood Damage" className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#6366F1] transition-colors" />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-bold text-slate-400 pl-1 uppercase tracking-wider">Amount Requested ($)</label>
+                    <input type="number" value={formData.amount} onChange={e => updateForm("amount", Number(e.target.value))} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#6366F1] transition-colors" />
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold text-slate-400 pl-1 uppercase tracking-wider">General Description</label>
+                  <textarea value={formData.description} onChange={e => updateForm("description", e.target.value)} rows={2} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#6366F1] transition-colors placeholder:text-slate-600" placeholder="A short description of what you are claiming for..."></textarea>
+                </div>
+                <div className="h-px w-full bg-white/5 my-2"></div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-bold text-slate-400 pl-1 uppercase tracking-wider">Disaster Date</label>
+                    <input type="date" value={formData.disasterDate} onChange={e => updateForm("disasterDate", e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#6366F1] transition-colors" />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-bold text-slate-400 pl-1 uppercase tracking-wider">Disaster Time</label>
+                    <input type="time" value={formData.disasterTime} onChange={e => updateForm("disasterTime", e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#6366F1] transition-colors" />
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold text-slate-400 pl-1 uppercase tracking-wider">Disaster Location</label>
+                  <input type="text" value={formData.disasterLocation} onChange={e => updateForm("disasterLocation", e.target.value)} placeholder="City, Region, or exact coordinates" className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#6366F1] transition-colors" />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold text-slate-400 pl-1 uppercase tracking-wider">Disaster Specifics</label>
+                  <textarea value={formData.disasterDetails} onChange={e => updateForm("disasterDetails", e.target.value)} rows={2} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#6366F1] transition-colors placeholder:text-slate-600" placeholder="Specific details about the disaster event itself..."></textarea>
                 </div>
               </div>
             }
@@ -178,92 +170,83 @@ export default function ClaimsClientPage(
               <div className="flex flex-col gap-4">
                 <h2 className="text-xl font-bold text-[#6366F1] mb-2">Choose Impact Type</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div onClick={() => setImpact("property")} className={`flex flex-col items-center justify-center gap-3 p-6 rounded-xl cursor-pointer transition-all border ${impact === "property" ? "bg-[#6366F1]/20 border-[#6366F1] text-white" : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10 hover:text-white"}`}>
-                    <House className="w-8 h-8" />
-                    <span className="font-medium">Property</span>
+                  <div onClick={() => setImpact("property")} className={`flex flex-col items-center text-center justify-center gap-2 p-6 rounded-xl cursor-pointer transition-all border ${impact === "property" ? "bg-[#6366F1]/20 border-[#6366F1] text-white" : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10 hover:text-white"}`}>
+                    <House className="w-8 h-8 mb-1" />
+                    <span className="font-bold">Property Impact</span>
+                    <span className="text-xs text-slate-400">Damage to residential or commercial real estate and vehicles.</span>
                   </div>
-                  <div onClick={() => setImpact("presence")} className={`flex flex-col items-center justify-center gap-3 p-6 rounded-xl cursor-pointer transition-all border ${impact === "presence" ? "bg-[#6366F1]/20 border-[#6366F1] text-white" : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10 hover:text-white"}`}>
-                    <Locate className="w-8 h-8" />
-                    <span className="font-medium">Presence</span>
+                  <div onClick={() => setImpact("presence")} className={`flex flex-col items-center text-center justify-center gap-2 p-6 rounded-xl cursor-pointer transition-all border ${impact === "presence" ? "bg-[#6366F1]/20 border-[#6366F1] text-white" : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10 hover:text-white"}`}>
+                    <Locate className="w-8 h-8 mb-1" />
+                    <span className="font-bold">Presence Impact</span>
+                    <span className="text-xs text-slate-400">Personal injury, medical expenses, or evacuation costs.</span>
                   </div>
-                  <div onClick={() => setImpact("livelihood")} className={`flex flex-col items-center justify-center gap-3 p-6 rounded-xl cursor-pointer transition-all border ${impact === "livelihood" ? "bg-[#6366F1]/20 border-[#6366F1] text-white" : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10 hover:text-white"}`}>
-                    <BriefcaseBusiness className="w-8 h-8" />
-                    <span className="font-medium">Livelihood</span>
+                  <div onClick={() => setImpact("livelihood")} className={`flex flex-col items-center text-center justify-center gap-2 p-6 rounded-xl cursor-pointer transition-all border ${impact === "livelihood" ? "bg-[#6366F1]/20 border-[#6366F1] text-white" : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10 hover:text-white"}`}>
+                    <BriefcaseBusiness className="w-8 h-8 mb-1" />
+                    <span className="font-bold">Livelihood / Economic Impact</span>
+                    <span className="text-xs text-slate-400">Business interruption, loss of employment, or verified income loss.</span>
                   </div>
                 </div>
               </div>
             }
-            {step === 2 && (
-              <div className="flex flex-col gap-4">
-                <h2 className="text-xl font-bold text-[#6366F1] mb-2">Upload Evidence</h2>
-
-                <div className="space-y-4">
-                  <label className="text-sm font-bold text-white/60 ml-1">UPLOAD EVIDENCE</label>
-                  <div {...getRootProps()} className="relative group transition-all">
-                    <input {...getInputProps()} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20" />
-                    <div className={`w-full h-32 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center gap-2 transition-all ${!image
-                        ? "border-white/20 bg-slate-800 group-hover:border-[#6366F1]/50 group-hover:bg-slate-700/50"
-                        : "border-green-400 bg-green-900/20"
-                      }`}>
-                      <Upload className={`w-8 h-8 ${!image ? "text-white/20 group-hover:text-[#6366F1]/60" : "text-green-400/60"}`} />
-                      <span className={`text-sm font-bold ${!image ? "text-white/40" : "text-green-400/60"}`}>
-                        {image ? "File selected" : "Choose file or drag & drop"}
-                      </span>
+            {step === 2 &&
+              <div className="flex flex-col gap-5">
+                <h2 className="text-xl font-bold text-[#6366F1] mb-2">Category Verification Details</h2>
+                {impact === "property" && (
+                  <div className="flex flex-col gap-4">
+                    <p className="text-sm text-slate-400 leading-relaxed mb-2">We need cross-reference records to evaluate property and asset damages against disaster logs.</p>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-bold text-slate-400 pl-1 uppercase tracking-wider">Home / Property Address</label>
+                      <input type="text" value={formData.homeAddress} onChange={e => updateForm("homeAddress", e.target.value)} placeholder="Full property location" className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#6366F1] transition-colors" />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-bold text-slate-400 pl-1 uppercase tracking-wider">Property Deed / Title No. (Optional)</label>
+                      <input type="text" placeholder="e.g. TITLE-194092" className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#6366F1] transition-colors" />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-bold text-slate-400 pl-1 uppercase tracking-wider">Vehicle License Plate (If Claiming Car Damage)</label>
+                      <input type="text" placeholder="e.g. SGM1234A" className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#6366F1] transition-colors" />
                     </div>
                   </div>
-                </div>
-
-                {image && (
-                  <div className="mt-6 flex flex-col gap-3">
-                    <h3 className="text-sm font-bold text-white/60 ml-1">PREVIEW</h3>
-                    <div className="rounded-2xl overflow-hidden border border-white/10 bg-black/40">
-                      <img src={image} alt="evidence" className="w-full h-auto max-h-[300px] object-contain" />
+                )}
+                {impact === "presence" && (
+                  <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-4 items-center justify-center h-40 bg-black/20 border border-white/5 rounded-2xl p-6 text-center">
+                      <Locate className="w-10 h-10 text-[#6366F1]/50" />
+                      <div>
+                        <h3 className="font-bold text-slate-200 mb-1">GPS Data Authorized</h3>
+                        <p className="text-sm text-slate-400">Your secure device location logs will be attached to verify your presence at the event.</p>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-bold text-slate-400 pl-1 uppercase tracking-wider">Mobile Telecom Provider</label>
+                      <input type="text" placeholder="e.g. Singtel, Starhub (for regional tower verification)" className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#6366F1] transition-colors" />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-bold text-slate-400 pl-1 uppercase tracking-wider">Hospital / Medical Bill Ref (Optional)</label>
+                      <input type="text" placeholder="e.g. SGH-2940-Bill" className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#6366F1] transition-colors" />
+                    </div>
+                  </div>
+                )}
+                {impact === "livelihood" && (
+                  <div className="flex flex-col gap-4">
+                    <p className="text-sm text-slate-400 leading-relaxed mb-2">Provide your business and commercial registry IDs to verify operational interruptions.</p>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-bold text-slate-400 pl-1 uppercase tracking-wider">Business UEN / Tax ID</label>
+                      <input type="text" value={formData.businessUen} onChange={e => updateForm("businessUen", e.target.value)} placeholder="e.g. 201827464C" className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#6366F1] transition-colors" />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-bold text-slate-400 pl-1 uppercase tracking-wider">Registered Company Name</label>
+                      <input type="text" placeholder="e.g. ABC Holdings Pte Ltd" className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#6366F1] transition-colors" />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-bold text-slate-400 pl-1 uppercase tracking-wider">Business Sector</label>
+                      <input type="text" value={formData.businessSector} onChange={e => updateForm("businessSector", e.target.value)} placeholder="e.g. F&B, Logistics, Retail" className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#6366F1] transition-colors" />
                     </div>
                   </div>
                 )}
               </div>
-            )}
+            }
             {step === 3 && (
-              <div className="flex flex-col gap-4">
-                <h2 className="text-xl font-bold text-[#6366F1] mb-6">Score Assessment</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
-                  <div className="flex flex-col items-center gap-3">
-                    <div className="text-sm font-medium text-slate-400 text-center">Records Analysis</div>
-                    <div className="w-20 h-20 rounded-full border-4 border-[#10B981] flex items-center justify-center bg-slate-800 shadow-[0_0_15px_rgba(16,185,129,0.2)]">
-                      <span className="text-xl font-bold text-white">{recordAnalysis}</span>
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-center gap-3">
-                    <div className="text-sm font-medium text-slate-400 text-center">GPS Data</div>
-                    <div className="w-20 h-20 rounded-full border-4 border-[#EF4444] flex items-center justify-center bg-slate-800 shadow-[0_0_15px_rgba(239,68,68,0.2)]">
-                      <span className="text-xl font-bold text-white">{gpsAnalysis}</span>
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-center gap-3">
-                    <div className="text-sm font-medium text-slate-400 text-center">Business Registry</div>
-                    <div className="w-20 h-20 rounded-full border-4 border-[#10B981] flex items-center justify-center bg-slate-800 shadow-[0_0_15px_rgba(16,185,129,0.2)]">
-                      <span className="text-xl font-bold text-white">{businessAnalysis}</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="bg-black/30 p-6 rounded-2xl border border-white/5 flex flex-col gap-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-400">Total Score</span>
-                    <span className="text-xl font-bold text-white">{totalScore}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-400">Threshold</span>
-                    <span className="font-bold text-white">0.8</span>
-                  </div>
-                  <div className="h-px bg-white/10 my-2" />
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-400">Result</span>
-                    <span className="text-2xl font-black text-[#EF4444] tracking-wider">FAIL</span>
-                  </div>
-                </div>
-              </div>
-            )}
-            {step === 4 && (
               <div className="flex flex-col gap-4">
                 <h2 className="text-xl font-bold text-[#6366F1] mb-6">{isSubmitting ? "Verifying Claim..." : "Verification Result"}</h2>
 
@@ -273,8 +256,47 @@ export default function ClaimsClientPage(
                     <p className="text-slate-400">Gemini AI is auditing your claim manifest...</p>
                   </div>
                 ) : verificationResult ? (
-                  <div className="flex flex-col items-center gap-6">
-                    <div className="w-32 h-32 rounded-full border-8 border-[#6366F1] flex flex-col items-center justify-center bg-[#6366F1]/10 shadow-[0_0_20px_rgba(99,102,241,0.3)]">
+                  <div className="flex flex-col items-center gap-6 w-full">
+                    {verificationResult.validator_data && (
+                      <div className="w-full bg-slate-800/80 rounded-2xl p-6 border border-white/5 shadow-xl mb-4">
+                        <h3 className={`text-center font-bold text-lg mb-6 ${verificationResult.validator_data.verification_anchor.disaster_verified ? 'text-[#10B981]' : 'text-[#EF4444]'}`}>
+                          {verificationResult.validator_data.verification_anchor.disaster_verified ? '✓ Disaster Verified' : '❌ Disaster Not Found'}
+                        </h3>
+                        
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                          <div className="flex flex-col items-center gap-3">
+                            <div className="text-xs font-bold text-slate-400 uppercase tracking-widest text-center h-8 flex items-end justify-center">IoT Sensors<br/>(Weather/Seismic)</div>
+                            <div className={`w-16 h-16 rounded-full border-[3px] flex items-center justify-center bg-black/40 ${verificationResult.validator_data.verification_anchor.data_sources.iot_sensor_match === 'PASS' ? 'border-[#10B981] shadow-[0_0_15px_rgba(16,185,129,0.3)]' : 'border-[#EF4444] shadow-[0_0_15px_rgba(239,68,68,0.3)]'}`}>
+                              <span className={`text-sm font-bold ${verificationResult.validator_data.verification_anchor.data_sources.iot_sensor_match === 'PASS' ? 'text-[#10B981]' : 'text-[#EF4444]'}`}>
+                                {verificationResult.validator_data.verification_anchor.data_sources.iot_sensor_match}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          <div className="flex flex-col items-center gap-3">
+                            <div className="text-xs font-bold text-slate-400 uppercase tracking-widest text-center h-8 flex items-end justify-center">News<br/>Reports</div>
+                            <div className="w-16 h-16 rounded-full border-[3px] border-[#6366F1] flex items-center justify-center bg-black/40 shadow-[0_0_15px_rgba(99,102,241,0.3)]">
+                              <span className="text-xl font-bold text-white">
+                                {verificationResult.validator_data.verification_anchor.data_sources.news_reports_found}
+                              </span>
+                            </div>
+                          </div>
+                      
+                          <div className="flex flex-col items-center gap-3">
+                            <div className="text-xs font-bold text-slate-400 uppercase tracking-widest text-center h-8 flex items-end justify-center">Oracle<br/>Consensus</div>
+                            <div className={`w-16 h-16 rounded-full border-[3px] flex items-center justify-center bg-black/40 ${verificationResult.validator_data.verification_anchor.data_sources.oracle_consensus >= 50 ? 'border-[#10B981] shadow-[0_0_15px_rgba(16,185,129,0.3)]' : 'border-[#EF4444] shadow-[0_0_15px_rgba(239,68,68,0.3)]'}`}>
+                              <span className="text-sm font-bold text-white">
+                                {verificationResult.validator_data.verification_anchor.data_sources.oracle_consensus}%
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+
+
+                    <div className="w-32 h-32 mt-4 rounded-full border-8 border-[#6366F1] flex flex-col items-center justify-center bg-[#6366F1]/10 shadow-[0_0_20px_rgba(99,102,241,0.3)]">
                       <div className="text-3xl font-bold text-white">{verificationResult.calculated_score}</div>
                       <div className="text-xs text-white/70">AI Confidence</div>
                     </div>
@@ -324,14 +346,13 @@ export default function ClaimsClientPage(
               </div>
             )}
           </div>
-          {step < 4 && (
             <div className="flex justify-between items-center mt-10 pt-6 border-t border-white/10">
               <button disabled={step === 0} onClick={decrementStep} className="px-6 py-2.5 rounded-xl font-bold text-sm bg-white/5 text-white hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-white/5 transition-all">
                 Previous
               </button>
 
               {step < MAX_STEP ? (
-                <button disabled={step === MAX_STEP || (step === 2 && !image)} onClick={incrementStep} className="px-8 py-2.5 rounded-xl font-bold text-sm bg-[#6366F1] text-white hover:bg-[#4F46E5] shadow-[0_0_20px_rgba(99,102,241,0.3)] transition-all disabled:opacity-50 disabled:shadow-none">
+                <button disabled={(step === 0 && (!formData.title || !formData.disasterLocation)) || (step === 1 && !impact)} onClick={incrementStep} className="px-8 py-2.5 rounded-xl font-bold text-sm bg-[#6366F1] text-white hover:bg-[#4F46E5] shadow-[0_0_20px_rgba(99,102,241,0.3)] transition-all disabled:opacity-50 disabled:shadow-none">
                   Next
                 </button>
               ) : (
@@ -340,7 +361,6 @@ export default function ClaimsClientPage(
                 </button>
               )}
             </div>
-          )}
         </div>
       </div>
     </main>

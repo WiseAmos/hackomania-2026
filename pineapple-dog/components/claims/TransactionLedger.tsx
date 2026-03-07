@@ -27,6 +27,13 @@ export default function TransactionLedger() {
     let grantsData: any[] = [];
     let wagersData: any[] = [];
 
+    const combineAndSort = () => {
+      const combined = [...claimsData, ...grantsData];
+      combined.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      setTransactions(combined);
+      setLoading(false);
+    };
+
     const unsubscribeClaims = onValue(claimsRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {

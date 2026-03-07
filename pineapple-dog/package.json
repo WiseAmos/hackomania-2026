@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@interledger/open-payments": "^7.3.0",
     "firebase": "^12.10.0",
     "firebase-admin": "^13.7.0",

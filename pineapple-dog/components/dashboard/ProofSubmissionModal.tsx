@@ -12,9 +12,11 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   wager: Wager | null;
+  hasUploadedToday?: boolean;
+  initialFile?: File | null;
 }
 
-export function ProofSubmissionModal({ isOpen, onClose, wager }: Props) {
+export function ProofSubmissionModal({ isOpen, onClose, wager, hasUploadedToday, initialFile }: Props) {
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [status, setStatus] = useState<'idle' | 'taking' | 'processing' | 'success'>('idle');
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -24,13 +26,22 @@ export function ProofSubmissionModal({ isOpen, onClose, wager }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
 
-  // Start camera when modal opens
+  // Start camera or handle initial file when modal opens
   useEffect(() => {
     if (isOpen) {
-      startCamera();
+      if (initialFile) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          setCapturedImage(e.target?.result as string);
+          setStatus('taking');
+        };
+        reader.readAsDataURL(initialFile);
+      } else {
+        startCamera();
+      }
     }
     return () => stopCamera();
-  }, [isOpen]);
+  }, [isOpen, initialFile]);
 
   const startCamera = async () => {
     try {
@@ -81,11 +92,44 @@ export function ProofSubmissionModal({ isOpen, onClose, wager }: Props) {
       reader.onload = (e) => {
         setCapturedImage(e.target?.result as string);
         setStatus('taking');
+        stopCamera();
       };
       reader.readAsDataURL(file);
     }
   };
 
+
+  const compressImage = (base64: string): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.src = base64;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 800;
+        const MAX_HEIGHT = 800;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.6)); // 0.6 quality
+      };
+    });
+  };
 
   const handleSubmit = async () => {
     if (!capturedImage || !user || !wager) return;
@@ -93,16 +137,15 @@ export function ProofSubmissionModal({ isOpen, onClose, wager }: Props) {
     setStatus('processing');
 
     try {
-      // Convert dataUrl to blob
-      const response = await fetch(capturedImage);
-      const blob = await response.blob();
+      if (hasUploadedToday) {
+        alert('You have already submitted proof for today!');
+        return;
+      }
 
-      // Upload to Firebase Storage
-      const storageRef = ref(storage, `proofs/${user.uid}/${Date.now()}.jpg`);
-      await uploadBytes(storageRef, blob);
-      const photoUrl = await getDownloadURL(storageRef);
+      // Compress the base64 image
+      const compressedBase64 = await compressImage(capturedImage);
 
-      // Submit to API
+      // Submit to API directly with base64 string
       const res = await fetch('/api/proofs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -113,12 +156,15 @@ export function ProofSubmissionModal({ isOpen, onClose, wager }: Props) {
           userHandle: user.handle,
           wagerId: wager.id,
           wagerTitle: wager.title,
-          photoUrl,
+          photoUrl: compressedBase64, // Using base64 directly
           caption: caption || 'Proof submitted',
         }),
       });
 
       if (!res.ok) throw new Error('Failed to submit proof');
+
+      // Trigger refresh in Chat UI
+      window.dispatchEvent(new CustomEvent('proof-submitted'));
 
       setStatus('success');
       setTimeout(() => {
@@ -256,13 +302,32 @@ export function ProofSubmissionModal({ isOpen, onClose, wager }: Props) {
                   <canvas ref={canvasRef} className="hidden" />
 
                   {!capturedImage && (
-                    <button
-                      onClick={capturePhoto}
-                      disabled={!stream}
-                      className="w-16 h-16 rounded-full bg-white border-4 border-white/20 flex items-center justify-center shadow-2xl active:scale-90 transition-transform disabled:opacity-50"
-                    >
-                      <div className="w-10 h-10 rounded-full border-2 border-slate-900"></div>
-                    </button>
+                    <div className="relative flex items-center justify-center w-full">
+                      <button
+                        onClick={capturePhoto}
+                        disabled={!stream}
+                        className="w-16 h-16 rounded-full bg-white border-4 border-white/20 flex items-center justify-center shadow-2xl active:scale-90 transition-transform disabled:opacity-50 relative z-10"
+                      >
+                        <div className="w-10 h-10 rounded-full border-2 border-slate-900"></div>
+                      </button>
+
+                      <div className="absolute right-4 md:right-8">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          ref={fileInputRef}
+                          onChange={handleFileChange}
+                          className="hidden"
+                        />
+                        <button
+                          onClick={() => fileInputRef.current?.click()}
+                          className="w-12 h-12 rounded-full bg-slate-900/60 backdrop-blur-xl border border-white/20 flex items-center justify-center shadow-2xl active:scale-90 transition-all text-slate-300 hover:text-white hover:bg-slate-800/80"
+                          title="Upload image"
+                        >
+                          <Upload className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </div>
                   )}
 
                   {capturedImage && status === 'taking' && (

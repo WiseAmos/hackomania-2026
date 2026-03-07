@@ -16,17 +16,17 @@ export interface ClaimManifest {
     property?: {
       home_address: string;
       registry_match: boolean;
-      satellite_damage_img: string;
+      satellite_damage_img?: string;
     };
     presence?: {
       gps_location_logs: { lat: number; lng: number }[];
       telecom_tower_data: string;
-      geotagged_media: string;
+      geotagged_media?: string;
     };
     livelihood?: {
       business_uen: string;
       sector: string;
-      income_loss_proof: string;
+      income_loss_proof?: string;
     };
   };
   votes: { count: number; voterIds: string[] };
@@ -155,7 +155,7 @@ export class PDLEngine {
       throw new Error("Missing API Key");
     }
 
-    const model = this.genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = this.genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
     const prompt = `
 Role: You are the PDL-Validator, a specialized AI agent designed to verify the real-world existence of natural disasters and significant public incidents.
 
@@ -199,7 +199,7 @@ ${JSON.stringify(disasterInfo, null, 2)}
       throw new Error("[PDL-Engine] AI Assessment requires a valid GEMINI_API_KEY. Mocking is disabled per user request.");
     }
 
-    const model = this.genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = this.genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
     
     const prompt = `
 Role: You are the PDL-Engine, a high-precision risk-assessment auditor for disaster relief claims. 

@@ -89,10 +89,10 @@ export default function ClaimsClientPage() {
           },
           selected_category: impact?.toUpperCase(),
           category_details: {
-            property: impact === "property" ? { home_address: formData.homeAddress, registry_match: true, satellite_damage_img: "mock_img.jpg" } : undefined,
-            presence: impact === "presence" ? { gps_location_logs: [], telecom_tower_data: "matched", geotagged_media: "mock_img.jpg" } : undefined,
-            livelihood: impact === "livelihood" ? { business_uen: formData.businessUen, sector: formData.businessSector, income_loss_proof: "mock_doc.pdf" } : undefined
-          }
+            property: impact === "property" ? { home_address: formData.homeAddress, registry_match: true } : undefined,
+            presence: impact === "presence" ? { gps_location_logs: [], telecom_tower_data: "matched" } : undefined,
+            livelihood: impact === "livelihood" ? { business_uen: formData.businessUen, sector: formData.businessSector } : undefined,
+          },
         })
       });
 

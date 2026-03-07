@@ -3,7 +3,7 @@ import crypto from "crypto";
 
 export const WALLET_ADDRESS = "https://ilp.interledger-test.dev/james";
 
-const KEY_ID = "1bb7ccfe-dc0b-4696-8c1e-a4fabcb7f9e7";
+const KEY_ID = "a25121d8-b1ef-4a81-8f75-2ee25d62dc64";
 
 const RAW_PRIVATE_KEY = `-----BEGIN PRIVATE KEY-----
 MC4CAQAwBQYDK2VwBCIEINvds4N1QhzkdAcHrBZhKpkQAHX0ltTsxn3qYTxVBtXz

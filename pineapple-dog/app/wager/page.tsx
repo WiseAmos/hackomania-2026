@@ -77,7 +77,7 @@ export default function WagerPage() {
                                     title: restored.title || "Untitled Showdown",
                                     description: restored.description || "",
                                     deadline: restored.deadline || "",
-                                    stakeAmount: Math.round(parseFloat(restored.stakeAmount || "0") * 100),
+                                    stakeAmount: parseFloat(restored.stakeAmount || "0"),
                                     wagerId: returnedWagerId,
                                     grantId,
                                     player1: {

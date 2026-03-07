@@ -21,14 +21,14 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
-  const writeUserProfile = async (uid: string, name: string, emailAddr: string) => {
+  const writeUserProfile = async (uid: string, name: string, emailAddr: string, photoUrl?: string | null) => {
     const userRef = ref(db, `users/${uid}`);
     const snap = await get(userRef);
     if (!snap.exists()) {
       await set(userRef, {
         name,
         email: emailAddr,
-        avatar: name.charAt(0).toUpperCase(),
+        avatar: photoUrl || name.charAt(0).toUpperCase(),
         handle: `@${name.toLowerCase().replace(/\s+/g, "")}`,
         walletAddress: "",
         createdAt: new Date().toISOString(),
@@ -44,7 +44,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
-      await writeUserProfile(user.uid, user.displayName || "User", user.email || "");
+      await writeUserProfile(user.uid, user.displayName || "User", user.email || "", user.photoURL);
       onClose();
       router.push("/dashboard");
     } catch (err) {

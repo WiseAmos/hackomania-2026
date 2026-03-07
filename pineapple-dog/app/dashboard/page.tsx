@@ -52,8 +52,13 @@ export default function ArenaDashboardLayout() {
       {/* Global Nav */}
       <nav className="w-full flex flex-col sm:flex-row justify-between items-center py-6 px-6 md:px-10 gap-6 border-b border-white/5 bg-slate-900/80 backdrop-blur-xl sticky top-0 z-50">
         <div className="flex items-center gap-4">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-[#6366F1] to-[#FF4D4D] flex items-center justify-center font-[family-name:var(--font-heading)] font-bold shadow-[0_0_16px_rgba(99,102,241,0.3)] text-white">
-            {user.avatar}
+          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-[#6366F1] to-[#FF4D4D] flex items-center justify-center font-[family-name:var(--font-heading)] font-bold shadow-[0_0_16px_rgba(99,102,241,0.3)] text-white overflow-hidden">
+            {user.avatar.startsWith('http') ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
+            ) : (
+              user.avatar
+            )}
           </div>
           <div>
             <h1 className="font-[family-name:var(--font-heading)] text-xl font-bold tracking-tight">Welcome, {user.name}</h1>

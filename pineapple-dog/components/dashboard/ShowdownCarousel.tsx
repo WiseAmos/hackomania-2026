@@ -20,7 +20,7 @@ export function ShowdownCarousel({ isLoading, wagers }: Props) {
     <div className="w-full mb-8">
       <div className="flex flex-col gap-6 max-w-lg mx-auto w-full">
         {wagers.map((wager, index) => (
-          <motion.div 
+          <motion.div
             key={wager.id}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -36,7 +36,7 @@ export function ShowdownCarousel({ isLoading, wagers }: Props) {
                   S${wager.totalStake} Pool
                 </div>
               </div>
-              
+
               <h3 className="font-[family-name:var(--font-heading)] text-lg sm:text-xl font-bold text-white leading-tight mb-4">
                 {wager.title}
               </h3>
@@ -45,14 +45,19 @@ export function ShowdownCarousel({ isLoading, wagers }: Props) {
               <div className="flex items-center gap-4">
                 <div className="flex -space-x-2">
                   {wager.participants.map((p, i) => (
-                    <div 
-                      key={i} 
+                    <div
+                      key={i}
                       className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full border-2 border-slate-800 flex items-center justify-center text-xs sm:text-sm font-bold shadow-md
                         ${p.status === 'alive' ? 'bg-[#6366F1] text-white' : 'bg-slate-700 text-slate-500 opacity-50 grayscale'}
                       `}
                       title={`${p.user.name} (${p.status})`}
                     >
-                      {p.user.avatar}
+                      {p.user.avatar.startsWith('http') ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img src={p.user.avatar} alt={p.user.name} className="w-full h-full rounded-full object-cover" />
+                      ) : (
+                        p.user.avatar
+                      )}
                     </div>
                   ))}
                 </div>

@@ -16,14 +16,17 @@ export interface ClaimManifest {
     property?: {
       home_address: string;
       registry_match: boolean;
+      satellite_damage_img?: string;
     };
     presence?: {
       gps_location_logs: { lat: number; lng: number }[];
       telecom_tower_data: string;
+      geotagged_media?: string;
     };
     livelihood?: {
       business_uen: string;
       sector: string;
+      income_loss_proof?: string;
     };
   };
   votes: { count: number; voterIds: string[] };
@@ -65,28 +68,6 @@ export interface UnifiedResponse {
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { adminDb } from "./firebaseAdmin";
-
-async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      return await fn();
-    } catch (error: any) {
-      if (error?.status === 429 && attempt < maxRetries - 1) {
-        let delayMs = Math.pow(2, attempt) * 2000; // default backoff
-        const match = error?.message?.match(/retry in (\d+(\.\d+)?)s/);
-        if (match) {
-           // parse exact delay from message if available, add 500ms buffer
-           delayMs = parseFloat(match[1]) * 1000 + 500;
-        }
-        console.warn(`[Rate Limit] 429 Too Many Requests. Retrying in ${delayMs.toFixed(0)}ms (Attempt ${attempt + 1}/${maxRetries})...`);
-        await new Promise(resolve => setTimeout(resolve, delayMs));
-      } else {
-        throw error;
-      }
-    }
-  }
-  throw new Error("Max retries exceeded");
-}
 
 export class PDLEngine {
   private genAI: GoogleGenerativeAI;
@@ -205,7 +186,7 @@ INPUT DATA:
 ${JSON.stringify(disasterInfo, null, 2)}
     `;
 
-    const result = await withRetry(() => model.generateContent(prompt));
+    const result = await model.generateContent(prompt);
     const text = result.response.text();
     const jsonStr = text.replace(/```json|```/g, "").trim();
     console.log("[PDL-Validator] Validation Result:", jsonStr);
@@ -218,8 +199,29 @@ ${JSON.stringify(disasterInfo, null, 2)}
       throw new Error("[PDL-Engine] AI Assessment requires a valid GEMINI_API_KEY. Mocking is disabled per user request.");
     }
 
-    const model = this.genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = this.genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     
+    // Create a sanitized copy of the manifest to avoid sending large base64 strings
+    const { category_details, ...manifestWithoutDetails } = manifest;
+
+    const sanitizedManifest = {
+      ...manifestWithoutDetails,
+      category_details: {
+        property: category_details?.property ? {
+          home_address: category_details.property.home_address,
+          registry_match: category_details.property.registry_match,
+        } : undefined,
+        presence: category_details?.presence ? {
+          gps_location_logs: category_details.presence.gps_location_logs,
+          telecom_tower_data: category_details.presence.telecom_tower_data,
+        } : undefined,
+        livelihood: category_details?.livelihood ? {
+          business_uen: category_details.livelihood.business_uen,
+          sector: category_details.livelihood.sector,
+        } : undefined,
+      }
+    };
+
     const prompt = `
 Role: You are the PDL-Engine, a high-precision risk-assessment auditor for disaster relief claims. 
 
@@ -263,10 +265,10 @@ OUTPUT FORMAT (JSON ONLY):
 }
 
 INPUT DATA:
-${JSON.stringify(manifest, null, 2)}
+${JSON.stringify(sanitizedManifest, null, 2)}
     `;
 
-    const result = await withRetry(() => model.generateContent(prompt));
+    const result = await model.generateContent(prompt);
     const text = result.response.text();
     const jsonStr = text.replace(/```json|```/g, "").trim();
     console.log("[PDL-Engine] AI Assessment Result:", jsonStr);

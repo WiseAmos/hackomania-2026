@@ -107,11 +107,6 @@ export default function ClaimsClientPage() {
   useEffect(() => {
   }, [impact])
 
-  // Mock scoring initially
-  const recordAnalysis = 0.27
-  const gpsAnalysis = 0.27
-  const businessAnalysis = 0.27
-  const totalScore = 0.27
 
   return (
     <main className="min-h-screen bg-slate-900 relative font-sans text-slate-100 selection:bg-[#6366F1]/30 pb-20">
@@ -299,30 +294,7 @@ export default function ClaimsClientPage() {
                       </div>
                     )}
 
-                    {verificationResult.calculated_score > 0 && (
-                      <div className="w-full bg-slate-800/80 rounded-2xl p-6 border border-white/5 shadow-xl mb-4">
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                          <div className="flex flex-col items-center gap-3">
-                            <div className="text-xs font-bold text-slate-400 uppercase tracking-widest text-center">Records<br/>Analysis</div>
-                            <div className="w-16 h-16 rounded-full border flex items-center justify-center bg-black/20 border-white/10">
-                              <span className="text-sm font-bold text-slate-300">0.27</span>
-                            </div>
-                          </div>
-                          <div className="flex flex-col items-center gap-3">
-                            <div className="text-xs font-bold text-slate-400 uppercase tracking-widest text-center">GPS<br/>Data</div>
-                            <div className="w-16 h-16 rounded-full border flex items-center justify-center bg-black/20 border-white/10">
-                              <span className="text-sm font-bold text-slate-300">0.27</span>
-                            </div>
-                          </div>
-                          <div className="flex flex-col items-center gap-3">
-                            <div className="text-xs font-bold text-slate-400 uppercase tracking-widest text-center">Business<br/>Registry</div>
-                            <div className="w-16 h-16 rounded-full border flex items-center justify-center bg-black/20 border-white/10">
-                              <span className="text-sm font-bold text-slate-300">0.27</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
+
 
                     <div className="w-32 h-32 mt-4 rounded-full border-8 border-[#6366F1] flex flex-col items-center justify-center bg-[#6366F1]/10 shadow-[0_0_20px_rgba(99,102,241,0.3)]">
                       <div className="text-3xl font-bold text-white">{verificationResult.calculated_score}</div>

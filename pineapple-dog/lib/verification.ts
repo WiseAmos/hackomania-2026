@@ -155,36 +155,58 @@ export class PDLEngine {
       throw new Error("Missing API Key");
     }
 
-    const model = this.genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
+    const model = this.genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
     const prompt = `
-Role: You are the PDL-Validator, a specialized AI agent designed to verify the real-world existence of natural disasters and significant public incidents.
+      Role: You are the PDL-Validator, a system that checks whether a disaster description is PLAUSIBLE enough to proceed with claim evaluation.
 
-Task: Before processing any individual claim, you must verify the "Disaster Anchor". Review the provided disaster_info (name, date, time, location, details).
-- Use your internal knowledge base and reasoning to evaluate if the described disaster or incident actually happened at that location and time, or is highly plausible/simulated as a legitimate event.
-- If it is valid, simulate a successful cross-reference check by generating realistic "PASS" ratings for IoT sensors and identifying simulated news reports.
-- If the event sounds completely fake, impossible, or contradicts known data, mark it as unverified and explain why in the issue_explanation.
+      Important:
+      This step is NOT meant to fact-check the real world. Your goal is simply to determine whether the described disaster sounds realistic and internally consistent.
 
-OUTPUT FORMAT (JSON ONLY):
-{
-  "verification_anchor": {
-    "disaster_verified": boolean,
-    "confidence_score": number,
-    "data_sources": {
-      "iot_sensor_match": "PASS" | "FAIL" | "DELAYED",
-      "news_reports_found": number,
-      "oracle_consensus": number
-    }
-  },
-  "event_details": {
-    "event_type": string,
-    "verified_timestamp": string,
-    "impact_radius_km": number
-  }
-}
+      Guidelines:
+      - If the disaster type, date, and description sound plausible for the region or situation, mark it as verified.
+      - Missing details should NOT cause rejection.
+      - If information is vague but reasonable, assume it is valid.
+      - Only reject if the event is clearly impossible, contradictory, or nonsensical.
 
-INPUT DATA:
-${JSON.stringify(disasterInfo, null, 2)}
-    `;
+      Examples of acceptable disasters:
+      - Floods
+      - Storms
+      - Earthquakes
+      - Wildfires
+      - Infrastructure failures
+      - Large accidents
+      - Public emergencies
+
+      Examples to reject:
+      - Physically impossible events
+      - Completely incoherent descriptions
+      - Obviously fabricated fantasy scenarios
+
+      OUTPUT FORMAT (JSON ONLY):
+      {
+        "verification_anchor": {
+          "disaster_verified": boolean,
+          "confidence_score": number,
+          "data_sources": {
+            "iot_sensor_match": "PASS" | "FAIL" | "DELAYED",
+            "news_reports_found": number,
+            "oracle_consensus": number
+          }
+        },
+        "event_details": {
+          "event_type": string,
+          "verified_timestamp": string,
+          "impact_radius_km": number
+        },
+        "issue_explanation": "Short explanation. If rejected, explain why it is implausible."
+      }
+
+      Important:
+      If the disaster sounds reasonably believable, set disaster_verified = true.
+
+      INPUT DATA:
+      ${JSON.stringify(disasterInfo, null, 2)}
+      `;
 
     const result = await model.generateContent(prompt);
     const text = result.response.text();
@@ -199,8 +221,8 @@ ${JSON.stringify(disasterInfo, null, 2)}
       throw new Error("[PDL-Engine] AI Assessment requires a valid GEMINI_API_KEY. Mocking is disabled per user request.");
     }
 
-    const model = this.genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
-    
+    const model = this.genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
     // Create a sanitized copy of the manifest to avoid sending large base64 strings
     const { category_details, ...manifestWithoutDetails } = manifest;
 
@@ -223,49 +245,72 @@ ${JSON.stringify(disasterInfo, null, 2)}
     };
 
     const prompt = `
-Role: You are the PDL-Engine, a high-precision risk-assessment auditor for disaster relief claims. 
+    Role: You are the PDL-Engine, evaluating disaster relief claims.
 
-Objective: Evaluate the following disaster claim manifest and provide a **NUANCED, GRADED scoring assessment**. 
+    Your job is to assign a FAIR but GENEROUS credibility score.
 
----
-SCORING GUIDELINES (Total Max 100):
-You must evaluate each section on a scale from 0 to its maximum value based on the evidence provided. Do NOT use binary (all-or-nothing) scores unless the evidence is absolute.
+    Important Principles:
+    - Claims should generally be given the benefit of the doubt.
+    - Incomplete information should not heavily penalize the score.
+    - Plausible claims should receive moderate-to-high scores.
+    - Only give very low scores if the claim is clearly inconsistent or unrealistic.
 
-1. Disaster Confirmation (Max 40):
-   - Score based on how well the disaster_info (name, date, time, details, location) matches known historical or real-time event patterns.
-   - High scores for specific, consistent details that align with the provided disaster type.
-   - Graded based on timing and description accuracy.
+    SCORING GUIDELINES (Total Max 100):
 
-2. Identity & Account Standing (Max 20):
-   - Score based on the completeness of the claim metadata (claim_id, title, description, submission_date).
-   - Higher scores for professional, consistent data.
+    1. Disaster Plausibility (Max 40)
+    Evaluate whether the disaster_info description sounds realistic and internally consistent.
 
-3. Location/Sector Match (Max 40):
-   - Graded based on the proximity of user's signals (home_address, gps_location_logs, or business_uen) to the disaster zone.
-   - 40 pts: Direct hit / exact location.
-   - 20-35 pts: Near impact zone / same city district.
-   - 5-19 pts: Regional proximity but not directly in the damage zone.
+    Typical scoring:
+    - 30–40: believable and detailed
+    - 20–30: plausible but limited information
+    - 10–20: vague but possible
+    - 0–10: clearly inconsistent or impossible
 
----
-TRIAGE TIERS:
-- Tier 1 (Score ≥ 70): Confirmed. 100% Payout. Status: DISBURSED.
-- Tier 2 (Score 50-69): Probable. 20% Payout. Status: PARTIAL_DISBURSED.
-- Tier 3 (Score < 50): Low Confidence. 0% Payout. Status: PENDING_HUMAN_REVIEW.
+    2. Claim Quality (Max 20)
+    Evaluate the completeness of the claim information.
 
----
-OUTPUT FORMAT (JSON ONLY):
-{
-  "calculated_score": number, 
-  "triage_tier": number,
-  "disbursement": {
-    "payout_percentage": number,
-    "status": "DISBURSED" | "PARTIAL_DISBURSED" | "PENDING_HUMAN_REVIEW"
-  },
-  "analysis_explanation": "A detailed 2-3 sentence explanation of why this score was given, citing specific evidence from the manifest."
-}
+    Typical scoring:
+    - 15–20: clear description
+    - 10–15: basic explanation
+    - 5–10: minimal details but understandable
 
-INPUT DATA:
-${JSON.stringify(sanitizedManifest, null, 2)}
+    3. Location / Sector Relevance (Max 40)
+
+    Score based on whether the claimant appears reasonably connected to the disaster location or affected sector.
+
+    Typical scoring:
+    - 30–40: directly located or clearly affected
+    - 20–30: nearby or plausible connection
+    - 10–20: indirect but possible
+    - 0–10: unrelated or inconsistent
+
+    TRIAGE TIERS:
+
+    Tier 1 (Score ≥ 60)
+    Status: DISBURSED
+    Payout: 100%
+
+    Tier 2 (Score 40–59)
+    Status: PARTIAL_DISBURSED
+    Payout: 20%
+
+    Tier 3 (Score < 40)
+    Status: PENDING_HUMAN_REVIEW
+    Payout: 0%
+
+    OUTPUT FORMAT (JSON ONLY):
+    {
+      "calculated_score": number,
+      "triage_tier": number,
+      "disbursement": {
+        "payout_percentage": number,
+        "status": "DISBURSED" | "PARTIAL_DISBURSED" | "PENDING_HUMAN_REVIEW"
+      },
+      "analysis_explanation": "2-3 sentence explanation referencing the claim data."
+    }
+
+    INPUT DATA:
+    ${JSON.stringify(sanitizedManifest, null, 2)}
     `;
 
     const result = await model.generateContent(prompt);

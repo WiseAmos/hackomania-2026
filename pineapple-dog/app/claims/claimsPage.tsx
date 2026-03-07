@@ -118,8 +118,7 @@ export default function ClaimsClientPage(
           selected_category: impact?.toUpperCase(),
           category_details: {
             [impact || "other"]: {
-              geotagged_media: image,
-              evidence_url: image
+              // Image data excluded per user request to save tokens
             }
           }
         })

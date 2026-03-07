@@ -113,7 +113,8 @@ export class PDLEngine {
       throw new Error("[PDL-Engine] AI Assessment requires a valid GEMINI_API_KEY. Mocking is disabled per user request.");
     }
 
-    const model = this.genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = this.genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+    
     const prompt = `
 Role: You are the PDL-Engine, a high-precision risk-assessment auditor for disaster relief claims. 
 
@@ -132,15 +133,11 @@ You must evaluate each section on a scale from 0 to its maximum value based on t
    - Score based on the completeness of the claim metadata (claim_id, title, description, submission_date).
    - Higher scores for professional, consistent data.
 
-3. Location/Sector Match (Max 30):
+3. Location/Sector Match (Max 40):
    - Graded based on the proximity of user's signals (home_address, gps_location_logs, or business_uen) to the disaster zone.
-   - 30 pts: Direct hit / exact location.
-   - 15-25 pts: Near impact zone / same city district.
-   - 5-14 pts: Regional proximity but not directly in the damage zone.
-
-4. Evidence Plausibility (Max 10):
-   - Graded based on URLs/data provided in category_details (satellite_damage_img, geotagged_media, income_loss_proof).
-   - Score for the data's relevance to the disaster type.
+   - 40 pts: Direct hit / exact location.
+   - 20-35 pts: Near impact zone / same city district.
+   - 5-19 pts: Regional proximity but not directly in the damage zone.
 
 ---
 TRIAGE TIERS:

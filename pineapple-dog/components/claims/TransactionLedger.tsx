@@ -28,7 +28,8 @@ export default function TransactionLedger() {
     let wagersData: any[] = [];
 
     const combineAndSort = () => {
-      const combined = [...claimsData, ...grantsData];
+      const combined = [...claimsData, ...grantsData, ...wagersData];
+      console.log(">>> [LEDGER] Combining data. Total entries:", combined.length);
       combined.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
       setTransactions(combined);
       setLoading(false);
@@ -112,14 +113,6 @@ export default function TransactionLedger() {
       console.log(">>> [LEDGER] Wagers/Stakes Data Updated:", wagersData.length);
       combineAndSort();
     });
-
-    const combineAndSort = () => {
-      const combined = [...claimsData, ...grantsData, ...wagersData];
-      console.log(">>> [LEDGER] Combining data. Total entries:", combined.length);
-      combined.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-      setTransactions(combined);
-      setLoading(false);
-    };
 
     return () => {
       unsubscribeClaims();

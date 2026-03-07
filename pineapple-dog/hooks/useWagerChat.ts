@@ -158,6 +158,14 @@ export function useWagerChat(userId?: string, activeWagerId?: string) {
 
   useEffect(() => {
     fetchWagers();
+
+    // Re-fetch wagers immediately when a grant is finalized (avoids 3s poll delay)
+    const handleGrantUpdated = () => {
+      console.log('[useWagerChat] wager-grant-updated event received — refreshing wagers');
+      fetchWagers();
+    };
+    window.addEventListener('wager-grant-updated', handleGrantUpdated);
+    return () => window.removeEventListener('wager-grant-updated', handleGrantUpdated);
   }, [userId]);
 
   useEffect(() => {

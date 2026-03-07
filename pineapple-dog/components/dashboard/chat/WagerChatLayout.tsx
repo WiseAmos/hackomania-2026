@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useWagerChat } from "../../../hooks/useWagerChat";
 import { WagerSidebar } from "./WagerSidebar";
 import { MobileStoryRow } from "./MobileStoryRow";
@@ -26,9 +26,20 @@ export function WagerChatLayout({ userId, onOpenCamera, onUploadFile }: LayoutPr
     }
   }, [wagers, activeId]);
 
-  // Auto-open the stake modal as soon as we detect a missing grant
+  const hasAutoOpened = useRef(false);
+
+  // If user just returned from wallet auth, suppress the modal immediately
+  // The dashboard's useEffect will handle the grant finalization
+  const justReturnedFromWallet = typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).has('interact_ref');
+
+  // Auto-open the stake modal once on load for the first wager needing a grant
+  // Don't re-open if user dismissed it, or if they just returned from wallet
   useEffect(() => {
+    if (hasAutoOpened.current) return;
+    if (justReturnedFromWallet) return;
     if (wagersNeedingGrant.length > 0 && !stakeModalWager) {
+      hasAutoOpened.current = true;
       const first = wagersNeedingGrant[0];
       setStakeModalWager({ id: first.id, title: first.title, stakeAmount: first.stakeAmount });
     }

@@ -102,33 +102,84 @@ export async function POST(req: NextRequest) {
       const poolAmount = totalAmount - halfAmount;
       console.log(`>>> [RESOLVE] Stake Split: ${totalAmount}c total. ${halfAmount}c to winner, ${poolAmount}c to pool`);
 
-      // 3a. Execute payment to winner (50%)
+      // 3a. Execute payment to winner using correct Open Payments protocol:
+      //     Step 1: Get non-interactive grant to create incoming payment at winner's wallet
+      //     Step 2: Create incoming payment specifying the amount
+      //     Step 3: Quote loser → winner using the incoming payment URL as receiver
+      //     Step 4: Execute outgoing payment from loser's wallet
       try {
-        console.log(`>>> [RESOLVE] Initiating ILP Quote: ${loserP.walletAddress} -> ${winnerP.walletAddress}`);
-        const winnerWalletAddress = normalizeWalletUrl(winnerP.walletAddress);
-        const loserWalletAddress = normalizeWalletUrl(loserP.walletAddress);
+        const loserWalletUrl: string = grant.walletUrl || normalizeWalletUrl(loserP.walletAddress || "");
 
-        const winnerWallet = await client.walletAddress.get({ url: winnerWalletAddress });
-        const loserWallet = await client.walletAddress.get({ url: loserWalletAddress });
+        // Resolve the winner's walletUrl from their grant record
+        let winnerWalletUrl: string = "";
+        if (winnerP.grantId) {
+          const winnerGrantSnap = await adminDb.ref(`grants/${winnerP.grantId}`).once("value");
+          if (winnerGrantSnap.exists()) winnerWalletUrl = winnerGrantSnap.val().walletUrl || "";
+        }
+        if (!winnerWalletUrl && wager.grantId) {
+          const creatorGrantSnap = await adminDb.ref(`grants/${wager.grantId}`).once("value");
+          if (creatorGrantSnap.exists()) winnerWalletUrl = creatorGrantSnap.val().walletUrl || "";
+        }
+        if (!winnerWalletUrl) winnerWalletUrl = normalizeWalletUrl(winnerP.walletAddress || "");
 
+        console.log(`>>> [RESOLVE] Wallet URLs — Loser: "${loserWalletUrl}", Winner: "${winnerWalletUrl}"`);
+
+        if (!loserWalletUrl || !winnerWalletUrl) {
+          throw new Error(`Missing wallet URL — loser: "${loserWalletUrl}", winner: "${winnerWalletUrl}"`);
+        }
+        if (loserWalletUrl === winnerWalletUrl) {
+          console.warn(`>>> [RESOLVE] WARNING: Loser and winner have the same wallet URL (${winnerWalletUrl}). This indicates a data issue where grants were not stored per-player. Skipping self-payment.`);
+          throw new Error("Same wallet for loser and winner — payment aborted to prevent self-transfer");
+        }
+
+        const winnerWallet = await client.walletAddress.get({ url: winnerWalletUrl });
+        const loserWallet = await client.walletAddress.get({ url: loserWalletUrl });
+        console.log(`>>> [RESOLVE] Wallets resolved — Loser: ${loserWallet.id}, Winner: ${winnerWallet.id}`);
+
+        // Step 1: Request a non-interactive grant to create an incoming payment at winner's wallet
+        console.log(`>>> [RESOLVE] Requesting incoming-payment grant at winner's auth server: ${winnerWallet.authServer}`);
+        const incomingGrant = await client.grant.request(
+          { url: winnerWallet.authServer },
+          {
+            access_token: {
+              access: [{ type: "incoming-payment", actions: ["create", "read", "complete"] }],
+            },
+          }
+        );
+        const incomingAccessToken = (incomingGrant as any).access_token?.value;
+        if (!incomingAccessToken) throw new Error("Failed to get incoming-payment access token for winner's wallet");
+
+        // Step 2: Create an incoming payment at the winner's wallet for exactly halfAmount
+        console.log(`>>> [RESOLVE] Creating incoming payment at winner's wallet for ${halfAmount}c`);
+        const incomingPayment = await client.incomingPayment.create(
+          { url: winnerWallet.resourceServer, accessToken: incomingAccessToken },
+          {
+            walletAddress: winnerWallet.id,
+            incomingAmount: { value: halfAmount.toString(), assetCode: "SGD", assetScale: 2 },
+          }
+        );
+        console.log(`>>> [RESOLVE] Incoming payment created: ${incomingPayment.id}`);
+
+        // Step 3: Create quote from loser → incoming payment URL (no debitAmount needed)
         const quote = await client.quote.create(
           { url: loserWallet.resourceServer, accessToken: grant.continueToken },
           {
             walletAddress: loserWallet.id,
-            receiver: winnerWallet.id,
+            receiver: incomingPayment.id,   // ← incoming payment URL, NOT wallet address
             method: "ilp",
-            debitAmount: { assetCode: "SGD", assetScale: 2, value: halfAmount.toString() },
+            // NOTE: amount is implicit from the incoming payment — do NOT pass debitAmount here
           }
         );
-        console.log(`>>> [RESOLVE] Quote created: ${quote.id}. Executing payment...`);
+        console.log(`>>> [RESOLVE] Quote created: ${quote.id}. Executing outgoing payment...`);
 
+        // Step 4: Execute the outgoing payment
         await client.outgoingPayment.create(
           { url: loserWallet.resourceServer, accessToken: grant.continueToken },
           { walletAddress: loserWallet.id, quoteId: quote.id }
         );
 
         totalPaidToWinner += halfAmount;
-        console.log(`>>> [RESOLVE] SUCCESS: Winner received ${halfAmount}c`);
+        console.log(`>>> [RESOLVE] SUCCESS: ${halfAmount}c transferred from loser to winner`);
       } catch (err) {
         console.error(`>>> [RESOLVE] ILP Failure (Winner Payout):`, err);
       }

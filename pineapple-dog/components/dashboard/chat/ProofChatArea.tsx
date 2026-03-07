@@ -44,19 +44,6 @@ export function ProofChatArea({ activeWager, onVote, onUpload, onOpenCamera, cur
            <span className="bg-slate-800/80 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-bold text-slate-400 uppercase tracking-wider border border-white/5 shadow-lg">
              --- TODAY, MAR 8 ---
            </span>
-           <AnimatePresence>
-             {isSyncing && (
-                <motion.div 
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="flex items-center gap-1.5 bg-[#6366F1]/10 border border-[#6366F1]/20 px-2 py-0.5 rounded-full"
-                >
-                  <div className="w-1.5 h-1.5 rounded-full bg-[#6366F1] animate-pulse" />
-                  <span className="text-[9px] font-black text-[#6366F1] uppercase tracking-widest">Live Syncing</span>
-                </motion.div>
-             )}
-           </AnimatePresence>
         </div>
 
         {activeWager.messages.map(m => {

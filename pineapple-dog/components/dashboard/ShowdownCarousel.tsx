@@ -46,7 +46,7 @@ export function ShowdownCarousel({ isLoading, wagers }: Props) {
               {/* Mini Avatars & Pool Row */}
               <div className="flex items-center gap-3">
                 <div className="flex -space-x-1.5">
-                  {wager.participants.map((p, i) => (
+                  {(wager.participants || [wager.player1, wager.player2]).map((p, i) => (
 <<<<<<< Updated upstream:pineapple-dog/components/dashboard/ShowdownCarousel.tsx
                     <div
                       key={i}
@@ -58,13 +58,13 @@ export function ShowdownCarousel({ isLoading, wagers }: Props) {
 >>>>>>> Stashed changes:pineapple-dog/my-app/components/dashboard/ShowdownCarousel.tsx
                         ${p.status === 'alive' ? 'bg-[#6366F1] text-white' : 'bg-slate-700 text-slate-500 opacity-50 grayscale'}
                       `}
-                      title={`${p.user.name} (${p.status})`}
+                      title={`${p.name} (${p.status})`}
                     >
-                      {p.user.avatar.startsWith('http') ? (
+                      {p.avatar.startsWith('http') ? (
                         /* eslint-disable-next-line @next/next/no-img-element */
-                        <img src={p.user.avatar} alt={p.user.name} className="w-full h-full rounded-full object-cover" />
+                        <img src={p.avatar} alt={p.name} className="w-full h-full rounded-full object-cover" />
                       ) : (
-                        p.user.avatar
+                        p.avatar
                       )}
                     </div>
                   ))}

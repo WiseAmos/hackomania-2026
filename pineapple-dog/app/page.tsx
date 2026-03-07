@@ -14,23 +14,31 @@ function NavBar({ isScrolled, onOpenAuth }: { isScrolled: boolean; onOpenAuth: (
     <nav className={`fixed w-full z-50 transition-all duration-500 ${isScrolled ? 'bg-[#0F172A]/80 backdrop-blur-xl border-b border-white/5 py-4 shadow-2xl' : 'bg-transparent py-8'}`}>
       <div className="max-w-7xl mx-auto px-6 md:px-12 flex justify-between items-center">
         {/* Logo */}
-        <Link href="/" className="font-[family-name:var(--font-heading)] text-2xl font-bold tracking-tight">
-          NEON<span className="text-[#6366F1]">BENTO</span>
+        <Link href="/" className="font-[family-name:var(--font-heading)] text-lg sm:text-2xl font-bold tracking-tight leading-tight flex-shrink-0">
+          PINEAPPLEDOG<br className="block sm:hidden" />
+          <span className="text-[#6366F1]">LEDGER</span>
         </Link>
 
         {/* Quick Links */}
-        <div className="hidden md:flex gap-10 text-sm font-medium text-white/60">
+        <div className="hidden lg:flex gap-10 text-sm font-medium text-white/60">
           <a href="#how-it-works" className="hover:text-white transition-colors duration-300">How it Works</a>
           <a href="#vault" className="hover:text-white transition-colors duration-300">The Vault</a>
           <a href="#impact" className="hover:text-white transition-colors duration-300">Live Claims</a>
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-6">
-          <button onClick={onOpenAuth} className="hidden sm:block text-sm font-medium text-white/60 hover:text-white transition-colors duration-300">Log In</button>
-          <button onClick={onOpenAuth} className="flex items-center gap-2 bg-[#6366F1] hover:bg-[#4F46E5] text-white px-6 py-2.5 rounded-full font-[family-name:var(--font-heading)] font-semibold text-sm transition-all duration-300 hover:shadow-[0_0_24px_rgba(99,102,241,0.5)] hover:-translate-y-0.5">
-            <Wallet className="w-4 h-4" />
-            Connect Wallet
+        <div className="flex items-center gap-3 sm:gap-6">
+          <button 
+            onClick={onOpenAuth} 
+            className="text-xs sm:text-sm font-medium text-white/60 hover:text-white transition-colors duration-300"
+          >
+            Log In
+          </button>
+          <button 
+            onClick={onOpenAuth} 
+            className="bg-[#6366F1] hover:bg-[#4F46E5] text-white px-5 sm:px-8 py-2 md:py-2.5 rounded-full font-[family-name:var(--font-heading)] font-semibold text-xs sm:text-sm transition-all duration-300 hover:shadow-[0_0_24px_rgba(99,102,241,0.5)] active:scale-95"
+          >
+            Sign Up
           </button>
         </div>
       </div>
@@ -335,11 +343,11 @@ function Footer() {
     <footer className="w-full py-12 md:py-16 border-t border-white/5 bg-[#0F172A]">
       <div className="max-w-7xl mx-auto px-6 md:px-12 flex flex-col md:flex-row justify-between items-center gap-8">
         <div className="flex flex-col items-center md:items-start text-center md:text-left">
-          <Link href="/" className="font-[family-name:var(--font-heading)] text-3xl font-bold tracking-tight text-white/40 hover:text-white transition-colors duration-300">
-            NEON<span className="text-white/20">BENTO</span>
+          <Link href="/" className="font-[family-name:var(--font-heading)] text-2xl font-bold tracking-tight text-white/40 hover:text-white transition-colors duration-300">
+            PINEAPPLEDOG<span className="text-white/20">LEDGER</span>
           </Link>
           <div className="mt-4 text-sm text-white/40 font-medium">
-            © 2026 NeonBento Protocol.<br className="md:hidden"/> All rights reserved.
+            © 2026 PineappleDogLedger Protocol.<br className="md:hidden"/> All rights reserved.
           </div>
         </div>
 

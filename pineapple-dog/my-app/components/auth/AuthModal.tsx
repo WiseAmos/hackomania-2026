@@ -4,6 +4,9 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Loader2, ArrowRight } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
+import { ref, set, get } from "firebase/database";
+import { auth, db, googleProvider } from "../../lib/firebase";
 import { GoogleIcon } from "../icons/GoogleIcon";
 
 interface AuthModalProps {
@@ -14,30 +17,66 @@ interface AuthModalProps {
 export function AuthModal({ isOpen, onClose }: AuthModalProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [authMethod, setAuthMethod] = useState<"google" | "email" | null>(null);
+  const [email, setEmail] = useState("");
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
-  const handleGoogleAuth = () => {
-    setIsLoading(true);
-    setAuthMethod("google");
-    
-    // Simulate background wallet provisioning and OAuth callback
-    setTimeout(() => {
-      setIsLoading(false);
-      onClose();
-      router.push("/dashboard");
-    }, 2500);
+  const writeUserProfile = async (uid: string, name: string, emailAddr: string) => {
+    const userRef = ref(db, `users/${uid}`);
+    const snap = await get(userRef);
+    if (!snap.exists()) {
+      await set(userRef, {
+        name,
+        email: emailAddr,
+        avatar: name.charAt(0).toUpperCase(),
+        handle: `@${name.toLowerCase().replace(/\s+/g, "")}`,
+        walletAddress: "",
+        createdAt: new Date().toISOString(),
+      });
+    }
   };
 
-  const handleEmailAuth = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleGoogleAuth = async () => {
     setIsLoading(true);
-    setAuthMethod("email");
-    
-    setTimeout(() => {
-      setIsLoading(false);
+    setAuthMethod("google");
+    setError(null);
+
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const user = result.user;
+      await writeUserProfile(user.uid, user.displayName || "User", user.email || "");
       onClose();
       router.push("/dashboard");
-    }, 2500);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Google sign-in failed");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleEmailAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) return;
+    setIsLoading(true);
+    setAuthMethod("email");
+    setError(null);
+
+    try {
+      // Try sign in first, if fails, create account
+      try {
+        const result = await signInWithEmailAndPassword(auth, email, "default_pass_123");
+        await writeUserProfile(result.user.uid, email.split("@")[0], email);
+      } catch {
+        const result = await createUserWithEmailAndPassword(auth, email, "default_pass_123");
+        await writeUserProfile(result.user.uid, email.split("@")[0], email);
+      }
+      onClose();
+      router.push("/dashboard");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Email sign-in failed");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -63,7 +102,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
           >
             {/* Loading Accent Bar */}
             {isLoading && (
-              <motion.div 
+              <motion.div
                 className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#6366F1] to-[#10B981] z-50 origin-left"
                 initial={{ scaleX: 0 }}
                 animate={{ scaleX: [0, 1, 0], translateX: ["0%", "0%", "100%"] }}
@@ -73,7 +112,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
 
             {/* Modal Header */}
             <div className="flex justify-end pt-4 pr-4 relative z-10">
-              <button 
+              <button
                 onClick={onClose}
                 disabled={isLoading}
                 className="text-white/40 hover:text-white transition-colors p-2 rounded-full hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -89,10 +128,21 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
                   Welcome to the Arena
                 </h2>
                 <p className="text-white/60 text-[15px] leading-relaxed max-w-[300px] mx-auto">
-                  Back yourself. Back the world.<br className="hidden sm:block"/>
+                  Back yourself. Back the world.<br className="hidden sm:block" />
                   Secure verification and seamless non-custodial wallet creation handled automatically.
                 </p>
               </div>
+
+              {/* Error Display */}
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 mb-4 text-red-400 text-sm text-center"
+                >
+                  {error}
+                </motion.div>
+              )}
 
               {/* Action Buttons */}
               <div className="space-y-4">
@@ -127,6 +177,8 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
                     <input
                       type="email"
                       placeholder="Enter with Email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
                       disabled={isLoading}
                       required
                       className="w-full bg-[#0F172A]/50 border border-white/10 rounded-xl px-5 h-14 text-white placeholder-white/40 focus:outline-none focus:border-[#6366F1]/50 focus:ring-1 focus:ring-[#6366F1]/50 focus:bg-[#0F172A] transition-all disabled:opacity-50 font-medium"

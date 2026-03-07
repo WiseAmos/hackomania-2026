@@ -13,10 +13,12 @@ import {
     Zap,
 } from "lucide-react";
 import Link from "next/link";
+import { useAuth } from "../../lib/AuthContext";
 
 type Step = "form" | "redirecting" | "authorized" | "waiting_opponent";
 
 export default function WagerPage() {
+    const { user } = useAuth();
     const [step, setStep] = useState<Step>("form");
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -55,16 +57,45 @@ export default function WagerPage() {
 
             // Retrieve stored grantId
             const grantId = sessionStorage.getItem("pendingGrantId");
+            const restored = savedForm ? JSON.parse(savedForm) : {};
 
             if (grantId) {
-                // Send interact_ref to backend
+                // Send interact_ref to backend to finalize the grant
                 fetch("/api/ilp/interact", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ grantId, interact_ref: interactRef, hash }),
                 })
                     .then((res) => res.json())
-                    .then(() => {
+                    .then(async () => {
+                        // Persist the wager in RTDB
+                        try {
+                            await fetch("/api/wagers", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                    title: restored.title || "Untitled Showdown",
+                                    description: restored.description || "",
+                                    deadline: restored.deadline || "",
+                                    stakeAmount: Math.round(parseFloat(restored.stakeAmount || "0") * 100),
+                                    wagerId: returnedWagerId,
+                                    grantId,
+                                    player1: {
+                                        uid: user?.uid || "",
+                                        name: user?.name || "Player 1",
+                                        avatar: user?.avatar || "?",
+                                        handle: user?.handle || "",
+                                        walletAddress: restored.myWallet || "",
+                                    },
+                                    player2: {
+                                        walletAddress: restored.opponentWallet || "",
+                                    },
+                                }),
+                            });
+                        } catch (e) {
+                            console.error("Failed to persist wager:", e);
+                        }
+
                         sessionStorage.removeItem("pendingGrantId");
                         sessionStorage.removeItem("pendingShowdown");
                         setStep("authorized");
@@ -81,7 +112,7 @@ export default function WagerPage() {
                     });
             }
         }
-    }, []);
+    }, [user]);
 
     const handleCreateShowdown = async () => {
         if (!title || !stakeAmount || !myWallet || !opponentWallet || !deadline) {

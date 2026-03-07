@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "@interledger/open-payments": "^7.3.0",
+    "firebase": "^12.10.0",
+    "firebase-admin": "^13.7.0",
     "framer-motion": "^12.35.0",
     "lucide-react": "^0.577.0",
     "next": "16.1.6",

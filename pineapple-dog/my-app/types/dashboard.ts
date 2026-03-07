@@ -7,7 +7,11 @@ export interface User {
 }
 
 export interface Participant {
-  user: User;
+  uid: string;
+  name: string;
+  avatar: string;
+  handle: string;
+  walletAddress?: string;
   status: 'alive' | 'eliminated';
   stakedAmount: number;
 }
@@ -18,9 +22,16 @@ export interface Wager {
   description: string;
   deadline: string;
   timeRemaining: string;
-  participants: Participant[];
+  player1: Participant;
+  player2: Participant;
   totalStake: number;
+  status: 'active' | 'resolved' | 'awaiting_auth';
+  winner?: string;
+  grantId?: string;
   imageUrl?: string;
+  createdAt?: string;
+  // Compat: carousel still uses participants array
+  participants?: Participant[];
 }
 
 export interface ProofPost {
@@ -34,7 +45,7 @@ export interface ProofPost {
   rejections: number;
 }
 
-export interface ReliefRecipient {
+export interface Recipient {
   name: string;
   avatar: string;
   bio: string;
@@ -45,8 +56,9 @@ export interface ImpactClaim {
   amount: number;
   wagerTitle: string;
   reliefFund: string;
-  recipient: ReliefRecipient;
+  recipient: Recipient;
   timestamp: string;
+  status?: string;
 }
 
 export interface PlatformStats {

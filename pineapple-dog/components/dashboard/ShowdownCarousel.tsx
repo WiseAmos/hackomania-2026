@@ -44,19 +44,19 @@ export function ShowdownCarousel({ isLoading, wagers }: Props) {
               {/* Mini Avatars & Pool Row */}
               <div className="flex items-center gap-4">
                 <div className="flex -space-x-2">
-                  {wager.participants.map((p, i) => (
+                  {(wager.participants || [wager.player1, wager.player2]).map((p, i) => (
                     <div
                       key={i}
                       className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full border-2 border-slate-800 flex items-center justify-center text-xs sm:text-sm font-bold shadow-md
                         ${p.status === 'alive' ? 'bg-[#6366F1] text-white' : 'bg-slate-700 text-slate-500 opacity-50 grayscale'}
                       `}
-                      title={`${p.user.name} (${p.status})`}
+                      title={`${p.name} (${p.status})`}
                     >
-                      {p.user.avatar.startsWith('http') ? (
+                      {p.avatar.startsWith('http') ? (
                         /* eslint-disable-next-line @next/next/no-img-element */
-                        <img src={p.user.avatar} alt={p.user.name} className="w-full h-full rounded-full object-cover" />
+                        <img src={p.avatar} alt={p.name} className="w-full h-full rounded-full object-cover" />
                       ) : (
-                        p.user.avatar
+                        p.avatar
                       )}
                     </div>
                   ))}

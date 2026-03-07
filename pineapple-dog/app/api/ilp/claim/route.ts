@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getOpenPaymentsClient, normalizeWalletUrl } from "../../../../lib/openPayments";
-import { assembleGrantsForClaim, getTotalPoolBalance } from "../../../../lib/store";
+import { adminDb } from "../../../../lib/firebaseAdmin";
 
 /**
  * POST /api/ilp/claim
@@ -11,104 +11,102 @@ import { assembleGrantsForClaim, getTotalPoolBalance } from "../../../../lib/sto
  *
  * Body: { claimantWallet, amount (in cents), description }
  */
+// ─── Fulfill the Claim from Firebase Grants ───────────────────────────────────
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
         const { claimantWallet, amount, description } = body;
 
         if (!claimantWallet || !amount) {
-            return NextResponse.json(
-                { message: "Missing claimantWallet or amount" },
-                { status: 400 }
-            );
+            return NextResponse.json({ message: "Missing claimantWallet or amount" }, { status: 400 });
         }
 
         const amountCents = parseInt(amount);
-        const poolBalance = getTotalPoolBalance();
+
+        // 1. Fetch available pool bounds
+        const grantsSnap = await adminDb.ref("pool/grants")
+            .orderByChild("status")
+            .equalTo("available")
+            .once("value");
+
+        const availableGrants: any[] = [];
+        let poolBalance = 0;
+
+        grantsSnap.forEach(child => {
+            const g = { id: child.key, ...child.val() };
+            availableGrants.push(g);
+            poolBalance += g.amount;
+        });
 
         if (poolBalance < amountCents) {
             return NextResponse.json(
-                {
-                    message: `Insufficient pool balance. Available: ${poolBalance} cents, Requested: ${amountCents} cents`,
-                    poolBalance,
-                    requested: amountCents,
-                },
+                { message: `Insufficient pool balance. Available: ${poolBalance} cents`, poolBalance, requested: amountCents },
                 { status: 400 }
             );
         }
 
-        // Smart assembly: pick the best combination of grants
-        const { grants, totalAssembled, sufficient } =
-            assembleGrantsForClaim(amountCents);
+        // Smart assembly: sort grants descending by amount, pick largest to minimize ILP requests
+        availableGrants.sort((a, b) => b.amount - a.amount);
+        const selectedGrants = [];
+        let totalAssembled = 0;
 
-        if (!sufficient) {
-            return NextResponse.json(
-                { message: "Could not assemble sufficient grants" },
-                { status: 500 }
-            );
+        for (const entry of availableGrants) {
+            if (totalAssembled >= amountCents) break;
+            selectedGrants.push(entry);
+            totalAssembled += entry.amount;
         }
 
         const client = await getOpenPaymentsClient();
         const claimantUrl = normalizeWalletUrl(claimantWallet);
-        const claimantWalletInfo = await client.walletAddress.get({
-            url: claimantUrl,
-        });
+        const claimantWalletInfo = await client.walletAddress.get({ url: claimantUrl });
 
         const payments: { grantId: string; amountPaid: number }[] = [];
         let remaining = amountCents;
 
-        for (const poolEntry of grants) {
+        // 2. Stream payments out of the OpenPayments network into the claimant
+        for (const poolEntry of selectedGrants) {
             if (remaining <= 0) break;
 
             const payAmount = Math.min(remaining, poolEntry.amount);
 
             try {
-                // Get the source wallet for this pool grant
-                const sourceWallet = await client.walletAddress.get({
-                    url: poolEntry.walletUrl,
-                });
+                const sourceWallet = await client.walletAddress.get({ url: poolEntry.walletUrl });
 
-                // Create a quote for this portion
                 const quote = await client.quote.create(
-                    {
-                        url: sourceWallet.resourceServer,
-                        accessToken: poolEntry.continueToken,
-                    },
+                    { url: sourceWallet.resourceServer, accessToken: poolEntry.continueToken },
                     {
                         walletAddress: sourceWallet.id,
                         receiver: claimantWalletInfo.id,
                         method: "ilp",
-                        debitAmount: {
-                            assetCode: "SGD",
-                            assetScale: 2,
-                            value: payAmount.toString(),
-                        },
+                        debitAmount: { assetCode: "SGD", assetScale: 2, value: payAmount.toString() },
                     }
                 );
 
-                // Execute the outgoing payment
                 await client.outgoingPayment.create(
-                    {
-                        url: sourceWallet.resourceServer,
-                        accessToken: poolEntry.continueToken,
-                    },
+                    { url: sourceWallet.resourceServer, accessToken: poolEntry.continueToken },
                     { walletAddress: sourceWallet.id, quoteId: quote.id }
                 );
 
-                // Mark this pool entry as claimed
-                poolEntry.status = "claimed";
-                payments.push({ grantId: poolEntry.grantId, amountPaid: payAmount });
+                // Determine if grant is heavily exhausted
+                const newAmount = poolEntry.amount - payAmount;
+                const newStatus = newAmount === 0 ? "claimed" : "available";
+
+                await adminDb.ref(`pool/grants/${poolEntry.id}`).update({
+                    amount: newAmount,
+                    status: newStatus
+                });
+
+                // Update TVL in stats
+                const tvlRef = adminDb.ref("pool/stats/totalValueLocked");
+                const tvlSnap = await tvlRef.once("value");
+                await tvlRef.set(Math.max(0, (tvlSnap.val() || 0) - payAmount));
+
+                payments.push({ grantId: poolEntry.id, amountPaid: payAmount });
                 remaining -= payAmount;
 
-                console.log(
-                    `[claim] Paid ${payAmount} cents from pool grant ${poolEntry.id} to ${claimantUrl}`
-                );
+                console.log(`[claim] Paid ${payAmount}c out from grant ${poolEntry.id}`);
             } catch (payErr) {
-                console.error(
-                    `[claim] Failed to pay from pool grant ${poolEntry.id}:`,
-                    payErr
-                );
-                // Continue with next grant — partial fulfillment is OK
+                console.error(`[claim] Failed ILP transit for grant ${poolEntry.id}:`, payErr);
             }
         }
 
@@ -124,9 +122,6 @@ export async function POST(req: NextRequest) {
         });
     } catch (err) {
         console.error("[ilp/claim] error:", err);
-        return NextResponse.json(
-            { message: "Failed to fulfill claim", error: String(err) },
-            { status: 500 }
-        );
+        return NextResponse.json({ message: "Failed to fulfill claim", error: String(err) }, { status: 500 });
     }
 }

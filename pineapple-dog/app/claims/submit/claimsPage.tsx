@@ -6,20 +6,17 @@ import { useDropzone } from "react-dropzone"
 import Link from "next/link";
 import { useAuth } from "@/lib/AuthContext"
 
-export default function ClaimsClientPage(
-  { currentDisasters }:
-    { currentDisasters: string[] }
-) {
+export default function ClaimsClientPage() {
   const [step, setStep] = useState(0);
   /* 
-  step 0: select disaster
+  step 0: Claim details
   step 1: choose impact type
-  step 2: upload evidence
-  step 3: analyse evidence
+  step 2: category verification details
+  step 3: upload evidence
+  step 4: analyse evidence
   */
-  const MAX_STEP = 4;
+  const MAX_STEP = 3;
 
-  const [disaster, setDisaster] = useState<null | string>(null);
   const [impact, setImpact] = useState<null | string>(null);
   const [image, setImage] = useState<null | string>(null);
 
@@ -53,10 +50,6 @@ export default function ClaimsClientPage(
     setFormData(prev => ({ ...prev, [field]: value }));
   }
 
-  function selectDisaster(d: string) {
-    setDisaster(d);
-  }
-
   function decrementStep() {
     if (step >= 1) setStep(prev => prev - 1);
   }
@@ -74,7 +67,7 @@ export default function ClaimsClientPage(
   async function handleSubmit() {
     if (!user) return;
     setIsSubmitting(true);
-    setStep(5);
+    setStep(4);
 
     try {
       const res = await fetch("/api/claims", {
@@ -84,11 +77,11 @@ export default function ClaimsClientPage(
           userId: user.uid,
           amount: formData.amount,
           description: formData.description,
-          reliefFund: disaster,
+          reliefFund: formData.title || "Community Relief Claim",
           wagerTitle: formData.title || "Community Relief Claim",
           claimantWallet: user.walletAddress || "test.wallet.near",
           disaster_info: {
-            name: disaster,
+            name: formData.title || "Unknown Incident",
             date: formData.disasterDate,
             time: formData.disasterTime,
             location: formData.disasterLocation,
@@ -113,11 +106,6 @@ export default function ClaimsClientPage(
       setIsSubmitting(false);
     }
   }
-
-  useEffect(() => {
-    // optional auto-advance if we strictly want it, but usually standard forms require clicking Next manually. 
-    // Disabled auto-advance to let users review the forms before proceeding.
-  }, [disaster])
 
   useEffect(() => {
   }, [impact])
@@ -175,25 +163,6 @@ export default function ClaimsClientPage(
           <h1 className="text-3xl font-bold font-[family-name:var(--font-heading)] text-white mb-8 text-center">Submit a claim</h1>
           <div className="flex flex-col gap-6 min-h-[300px]">
             {step === 0 &&
-              <div className="flex flex-col gap-4">
-                <h2 className="text-xl font-bold text-[#6366F1] mb-2">Select active disaster ({currentDisasters.length} results)</h2>
-                <div className="flex flex-col gap-3">
-                  {currentDisasters.map((d) => (
-                    <div
-                      key={d}
-                      onClick={() => setDisaster(d)}
-                      className={`p-4 rounded-xl cursor-pointer transition-all border ${disaster === d
-                          ? "bg-[#6366F1]/20 border-[#6366F1] text-white shadow-[0_0_15px_rgba(99,102,241,0.2)]"
-                          : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10 hover:text-white"
-                        }`}
-                    >
-                      {d}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            }
-            {step === 1 &&
               <div className="flex flex-col gap-5">
                 <h2 className="text-xl font-bold text-[#6366F1] mb-2">Claim &amp; Disaster Details</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -231,7 +200,7 @@ export default function ClaimsClientPage(
                 </div>
               </div>
             }
-            {step === 2 &&
+            {step === 1 &&
               <div className="flex flex-col gap-4">
                 <h2 className="text-xl font-bold text-[#6366F1] mb-2">Choose Impact Type</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -250,7 +219,7 @@ export default function ClaimsClientPage(
                 </div>
               </div>
             }
-            {step === 3 &&
+            {step === 2 &&
               <div className="flex flex-col gap-5">
                 <h2 className="text-xl font-bold text-[#6366F1] mb-2">Category Verification Details</h2>
                 {impact === "property" && (
@@ -286,7 +255,7 @@ export default function ClaimsClientPage(
                 )}
               </div>
             }
-            {step === 4 && (
+            {step === 3 && (
               <div className="flex flex-col gap-4">
                 <h2 className="text-xl font-bold text-[#6366F1] mb-2">Upload Evidence</h2>
 
@@ -316,7 +285,7 @@ export default function ClaimsClientPage(
                 )}
               </div>
             )}
-            {step === 5 && (
+            {step === 4 && (
               <div className="flex flex-col gap-4">
                 <h2 className="text-xl font-bold text-[#6366F1] mb-6">{isSubmitting ? "Verifying Claim..." : "Verification Result"}</h2>
 
@@ -439,14 +408,14 @@ export default function ClaimsClientPage(
               </div>
             )}
           </div>
-          {step < 5 && (
+          {step < 4 && (
             <div className="flex justify-between items-center mt-10 pt-6 border-t border-white/10">
               <button disabled={step === 0} onClick={decrementStep} className="px-6 py-2.5 rounded-xl font-bold text-sm bg-white/5 text-white hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-white/5 transition-all">
                 Previous
               </button>
 
               {step < MAX_STEP ? (
-                <button disabled={step === MAX_STEP || (step === 0 && !disaster) || (step === 2 && !impact)} onClick={incrementStep} className="px-8 py-2.5 rounded-xl font-bold text-sm bg-[#6366F1] text-white hover:bg-[#4F46E5] shadow-[0_0_20px_rgba(99,102,241,0.3)] transition-all disabled:opacity-50 disabled:shadow-none">
+                <button disabled={(step === 0 && (!formData.title || !formData.disasterLocation)) || (step === 1 && !impact)} onClick={incrementStep} className="px-8 py-2.5 rounded-xl font-bold text-sm bg-[#6366F1] text-white hover:bg-[#4F46E5] shadow-[0_0_20px_rgba(99,102,241,0.3)] transition-all disabled:opacity-50 disabled:shadow-none">
                   Next
                 </button>
               ) : (

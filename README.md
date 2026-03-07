@@ -1,7 +1,8 @@
 # Pineapple Dog Ledger (PDL)
 
-<img src="./logo.png" alt="Pineapple Dog Ledger Logo" width="200" />
-<br />
+<div align="center">
+  <img src="./logo.png" alt="Pineapple Dog Ledger Logo" width="400" />
+</div>
 
 **Pineapple Dog Ledger (PDL)** is a decentralized, community-governed micro-disaster insurance platform that reimagines aid as a transparent, automated ecosystem. Powered by the **Interledger Protocol (ILP)** for friction-less global value transfer and **Multi-Modal AI** (Google Gemini 2.5 Flash) for high-integrity verification, PDL ensures that support reaches those in need at the speed of the internet—eliminating administrative overhead to provide fast, fair, and empathetic payouts during crises.
 

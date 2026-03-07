@@ -4,6 +4,9 @@ import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Camera, Ghost, Loader2, Sparkles, Trophy, Upload, X } from "lucide-react";
 import { Wager } from "../../types/dashboard";
+import { useAuth } from "../../lib/AuthContext";
+import { storage } from "../../lib/firebase";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 interface Props {
   isOpen: boolean;
@@ -15,32 +18,35 @@ export function ProofSubmissionModal({ isOpen, onClose, wager }: Props) {
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [status, setStatus] = useState<'idle' | 'taking' | 'processing' | 'success'>('idle');
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const [caption, setCaption] = useState('');
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { user } = useAuth();
 
   // Start camera when modal opens
   useEffect(() => {
-    if (isOpen && !capturedImage) {
+    if (isOpen) {
       startCamera();
-    } else {
-      stopCamera();
     }
     return () => stopCamera();
-  }, [isOpen, capturedImage]);
+  }, [isOpen]);
 
   const startCamera = async () => {
     try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment' }, 
-        audio: false 
-      });
+      if (videoRef.current) {
+        videoRef.current.srcObject = null; // ← clear stale ref
+      }
+      const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true });
       setStream(mediaStream);
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
+        videoRef.current.muted = true;
+        await videoRef.current.play(); // ← await directly, no .then/.catch
       }
     } catch (err) {
       console.error("Error accessing camera:", err);
+      alert("Camera access failed. Please check permissions.");
     }
   };
 
@@ -55,8 +61,8 @@ export function ProofSubmissionModal({ isOpen, onClose, wager }: Props) {
     if (videoRef.current && canvasRef.current) {
       const video = videoRef.current;
       const canvas = canvasRef.current;
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
+      canvas.width = video.videoWidth || 640;   // ← fallback dimensions
+      canvas.height = video.videoHeight || 480;
       const context = canvas.getContext('2d');
       if (context) {
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -80,17 +86,54 @@ export function ProofSubmissionModal({ isOpen, onClose, wager }: Props) {
     }
   };
 
-  const handleSubmit = () => {
+
+  const handleSubmit = async () => {
+    if (!capturedImage || !user || !wager) return;
+
     setStatus('processing');
-    setTimeout(() => {
+
+    try {
+      // Convert dataUrl to blob
+      const response = await fetch(capturedImage);
+      const blob = await response.blob();
+
+      // Upload to Firebase Storage
+      const storageRef = ref(storage, `proofs/${user.uid}/${Date.now()}.jpg`);
+      await uploadBytes(storageRef, blob);
+      const photoUrl = await getDownloadURL(storageRef);
+
+      // Submit to API
+      const res = await fetch('/api/proofs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.uid,
+          userName: user.name,
+          userAvatar: user.avatar,
+          userHandle: user.handle,
+          wagerId: wager.id,
+          wagerTitle: wager.title,
+          photoUrl,
+          caption: caption || 'Proof submitted',
+        }),
+      });
+
+      if (!res.ok) throw new Error('Failed to submit proof');
+
       setStatus('success');
       setTimeout(() => {
-        setStatus('idle');
-        setCapturedImage(null);
         onClose();
-      }, 3000);
-    }, 2000);
+        setCapturedImage(null);
+        setCaption('');
+        setStatus('idle');
+      }, 2000);
+    } catch (err) {
+      console.error('Submit error:', err);
+      alert('Failed to submit proof. Please try again.');
+      setStatus('taking');
+    }
   };
+
 
   if (!wager) return null;
 
@@ -105,7 +148,7 @@ export function ProofSubmissionModal({ isOpen, onClose, wager }: Props) {
             className="absolute inset-0 bg-slate-950/90 backdrop-blur-2xl"
             onClick={onClose}
           />
-          
+
           <motion.div
             initial={{ opacity: 0, scale: 0.9, y: 40 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -114,32 +157,32 @@ export function ProofSubmissionModal({ isOpen, onClose, wager }: Props) {
           >
             {/* Header */}
             <div className="p-8 pb-4 flex justify-between items-center z-50">
-               <div>
-                 <div className="text-[10px] font-black text-[#6366F1] uppercase tracking-[0.2em] mb-1">PROVING CHALLENGE</div>
-                 <h3 className="text-xl font-black text-white truncate max-w-[240px]">{wager.title}</h3>
-               </div>
-               <button 
+              <div>
+                <div className="text-[10px] font-black text-[#6366F1] uppercase tracking-[0.2em] mb-1">PROVING CHALLENGE</div>
+                <h3 className="text-xl font-black text-white truncate max-w-[240px]">{wager.title}</h3>
+              </div>
+              <button
                 onClick={onClose}
                 className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors"
-               >
-                 <X className="w-6 h-6 text-slate-400" />
-               </button>
+              >
+                <X className="w-6 h-6 text-slate-400" />
+              </button>
             </div>
 
             {/* BeReal Frame */}
             <div className="flex-1 px-4 pb-4">
               <div className="relative h-full w-full bg-slate-950 rounded-[2.5rem] border-2 border-slate-800 overflow-hidden shadow-inner flex flex-col">
-                
+
                 <AnimatePresence mode="wait">
                   {capturedImage ? (
-                    <motion.div 
+                    <motion.div
                       key="preview"
                       initial={{ scale: 1.1, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
                       className="absolute inset-0"
                     >
                       <img src={capturedImage} className="w-full h-full object-cover" alt="Proof" />
-                      
+
                       {/* BeReal Style Overlay */}
                       <div className="absolute top-6 left-6">
                         <div className="bg-black/40 backdrop-blur-md px-4 py-2 rounded-xl border border-white/5">
@@ -150,7 +193,7 @@ export function ProofSubmissionModal({ isOpen, onClose, wager }: Props) {
 
                       {/* Success Overlay */}
                       {status === 'success' && (
-                        <motion.div 
+                        <motion.div
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
                           className="absolute inset-0 bg-[#10B981]/80 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center"
@@ -164,30 +207,30 @@ export function ProofSubmissionModal({ isOpen, onClose, wager }: Props) {
                       )}
                     </motion.div>
                   ) : (
-                    <motion.div 
+                    <motion.div
                       key="camera-view"
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       className="absolute inset-0 bg-black flex flex-col items-center justify-center overflow-hidden"
                     >
-                      {stream ? (
-                        <video 
-                          ref={videoRef} 
-                          autoPlay 
-                          playsInline 
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
+                      <video
+                        ref={videoRef}
+                        autoPlay
+                        playsInline
+                        muted
+                        className={`w-full h-full object-cover min-h-[200px] ${stream ? '' : 'hidden'}`}
+                      />
+                      {!stream && (
                         <div className="flex flex-col items-center">
                           <Loader2 className="w-8 h-8 text-[#6366F1] animate-spin mb-4" />
                           <div className="text-slate-500 text-[10px] font-bold uppercase tracking-widest text-center px-10">
-                            INITIALIZING LENS...
+                            REQUESTING CAMERA PERMISSION...
                           </div>
                         </div>
                       )}
 
                       {/* Scanner Line */}
-                      <motion.div 
+                      <motion.div
                         animate={{ top: ['0%', '100%', '0%'] }}
                         transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
                         className="absolute left-0 right-0 h-[1px] bg-[#6366F1]/50 z-20 shadow-[0_0_15px_#6366F1]"
@@ -211,9 +254,9 @@ export function ProofSubmissionModal({ isOpen, onClose, wager }: Props) {
                 {/* Shutter Controls */}
                 <div className="absolute bottom-10 left-0 right-0 p-8 flex justify-center items-center z-50">
                   <canvas ref={canvasRef} className="hidden" />
-                  
+
                   {!capturedImage && (
-                    <button 
+                    <button
                       onClick={capturePhoto}
                       disabled={!stream}
                       className="w-16 h-16 rounded-full bg-white border-4 border-white/20 flex items-center justify-center shadow-2xl active:scale-90 transition-transform disabled:opacity-50"
@@ -223,19 +266,28 @@ export function ProofSubmissionModal({ isOpen, onClose, wager }: Props) {
                   )}
 
                   {capturedImage && status === 'taking' && (
-                    <div className="flex gap-3 w-full max-w-[240px]">
-                      <button 
-                        onClick={() => { setCapturedImage(null); setStatus('idle'); }}
-                        className="flex-1 h-12 bg-slate-900/80 backdrop-blur-xl border border-white/10 text-white rounded-xl font-bold text-xs"
-                      >
-                        RETAKE
-                      </button>
-                      <button 
-                        onClick={handleSubmit}
-                        className="flex-1 h-12 bg-[#10B981] text-slate-900 rounded-xl font-black text-xs shadow-lg shadow-[#10B981]/20 flex items-center justify-center gap-2"
-                      >
-                        <Upload className="w-4 h-4" /> SUBMIT
-                      </button>
+                    <div className="flex flex-col gap-3 w-full max-w-[240px]">
+                      <input
+                        type="text"
+                        value={caption}
+                        onChange={(e) => setCaption(e.target.value)}
+                        placeholder="Add a caption..."
+                        className="w-full h-12 bg-slate-900/80 backdrop-blur-xl border border-white/10 text-white rounded-xl px-4 font-bold text-xs placeholder:text-slate-400"
+                      />
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => { setCapturedImage(null); setStatus('idle'); setCaption(''); }}
+                          className="flex-1 h-12 bg-slate-900/80 backdrop-blur-xl border border-white/10 text-white rounded-xl font-bold text-xs"
+                        >
+                          RETAKE
+                        </button>
+                        <button
+                          onClick={handleSubmit}
+                          className="flex-1 h-12 bg-[#10B981] text-slate-900 rounded-xl font-black text-xs shadow-lg shadow-[#10B981]/20 flex items-center justify-center gap-2"
+                        >
+                          <Upload className="w-4 h-4" /> SUBMIT
+                        </button>
+                      </div>
                     </div>
                   )}
 
@@ -251,8 +303,8 @@ export function ProofSubmissionModal({ isOpen, onClose, wager }: Props) {
 
             {/* Hint */}
             <div className="p-6 pt-2 flex items-center justify-center gap-2 text-[9px] font-black text-slate-500 uppercase tracking-widest text-center">
-               <Sparkles className="w-3 h-3 text-amber-500" />
-               Your proof will be verified by the community
+              <Sparkles className="w-3 h-3 text-amber-500" />
+              Your proof will be verified by the community
             </div>
           </motion.div>
         </div>

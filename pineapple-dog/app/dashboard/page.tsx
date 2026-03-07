@@ -72,7 +72,6 @@ export default function ArenaDashboardLayout() {
     setIsProveModalOpen(true);
   };
 
-
   return (
     <main className="min-h-screen bg-slate-900 relative pb-20 font-sans text-slate-100 selection:bg-[#6366F1]/30">
 

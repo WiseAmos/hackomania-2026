@@ -1,21 +1,24 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { LogOut, Plus, Wallet } from "lucide-react";
 import Link from "next/link";
 import { useActiveShowdowns, useArenaFeed, useImpactPortfolio } from "../../hooks/useDashboardData";
 import { ShowdownCarousel } from "../../components/dashboard/ShowdownCarousel";
 import { ProofFeed } from "../../components/dashboard/ProofFeed";
-import { ImpactSidebar } from "../../components/dashboard/ImpactSidebar";
+import { ImpactSection } from "../../components/dashboard/ImpactSection";
 
 // ----------------------------------------------------------------------
 // Layout Root Setup
 // ----------------------------------------------------------------------
 
 export default function ArenaDashboardLayout() {
+  const [activeTab, setActiveTab] = useState<"personal" | "arena" | "impact">("personal");
+
   const { wagers, isLoading: isLoadingWagers } = useActiveShowdowns();
   const { feed, isLoading: isLoadingFeed } = useArenaFeed();
-  const { claims, stats, isLoading: isLoadingImpact } = useImpactPortfolio();
+  const { claims, isLoading: isLoadingImpact } = useImpactPortfolio();
 
   return (
     <main className="min-h-screen bg-slate-900 relative pb-20 font-sans text-slate-100 selection:bg-[#6366F1]/30">
@@ -37,53 +40,90 @@ export default function ArenaDashboardLayout() {
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <div className="bg-slate-800 border border-white/10 rounded-full px-5 py-2 flex items-center gap-3 shadow-inner">
             <Wallet className="w-3.5 h-3.5 text-[#06B6D4]" />
             <span className="font-bold text-sm text-[#06B6D4]">150.00 SGD</span>
           </div>
-          <button className="bg-[#6366F1] hover:bg-[#4F46E5] text-white px-5 py-2.5 rounded-full font-[family-name:var(--font-heading)] font-bold text-sm flex items-center gap-2 transition-all shadow-[0_0_24px_rgba(99,102,241,0.4)] hover:-translate-y-0.5 active:scale-95">
+          <Link href="/wager" className="bg-[#6366F1] hover:bg-[#4F46E5] text-white px-5 py-2.5 rounded-full font-[family-name:var(--font-heading)] font-bold text-sm flex items-center gap-2 transition-all shadow-[0_0_24px_rgba(99,102,241,0.4)] hover:-translate-y-0.5 active:scale-95">
             <Plus className="w-4 h-4" />
             New Showdown
-          </button>
+          </Link>
         </div>
       </nav>
 
       {/* 
-        Macro-Layout Responsive Grid Shell 
-        Mobile: 1 Column | Desktop: 3 Columns [Main: 2] [Sidebar: 1]
+        Macro-Layout Responsive Tab Shell 
       */}
-      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 relative z-10">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-          
-          {/* Main Content Area (Spans 2 cols) */}
-          <div className="lg:col-span-2 flex flex-col gap-8 w-full min-w-0">
-             
-             {/* 1. Top Section: Active Showdowns (Carousel) */}
-             <motion.div
-               initial={{ opacity: 0, y: 20 }}
-               animate={{ opacity: 1, y: 0 }}
-               transition={{ duration: 0.5 }}
-             >
-               <ShowdownCarousel isLoading={isLoadingWagers} wagers={wagers} />
-             </motion.div>
-
-             {/* 2. Center Stage: Proof Feed */}
-             <div className="w-full">
-               <h2 className="text-xl font-bold font-[family-name:var(--font-heading)] text-white mb-4">
-                  The Arena Feed
-               </h2>
-               <ProofFeed isLoading={isLoadingFeed} posts={feed} />
-             </div>
-
-          </div>
-
-          {/* 3. Right Sidebar: Impact Portfolio */}
-          <div className="lg:col-span-1 w-full lg:sticky lg:top-[120px]">
-             <ImpactSidebar isLoading={isLoadingImpact} claims={claims} stats={stats} />
-          </div>
-
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 relative z-10 flex flex-col gap-8">
+        
+        {/* Rectangular Navigation Tabs (Pill shaped, mobile responsive) */}
+        <div className="flex overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] bg-slate-800/80 p-1.5 rounded-full border border-white/5 w-full max-w-2xl mx-auto shadow-xl backdrop-blur-md">
+           <button 
+             onClick={() => setActiveTab("personal")}
+             className={`flex-1 min-w-[max-content] py-3 px-5 sm:px-6 rounded-full text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${activeTab === "personal" ? "bg-slate-700 text-white shadow-md border border-white/5" : "text-slate-400 hover:text-slate-200 hover:bg-white/5"}`}
+           >
+             My Showdowns
+           </button>
+           <button 
+             onClick={() => setActiveTab("arena")}
+             className={`flex-1 min-w-[max-content] py-3 px-5 sm:px-6 rounded-full text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${activeTab === "arena" ? "bg-slate-700 text-white shadow-md border border-white/5" : "text-slate-400 hover:text-slate-200 hover:bg-white/5"}`}
+           >
+             Global Arena
+           </button>
+           <button 
+             onClick={() => setActiveTab("impact")}
+             className={`flex-1 min-w-[max-content] py-3 px-5 sm:px-6 rounded-full text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${activeTab === "impact" ? "bg-[#10B981]/15 text-[#10B981] shadow-md border border-[#10B981]/20" : "text-slate-400 hover:text-[#10B981] hover:bg-[#10B981]/5"}`}
+           >
+             My Impact Portfolio
+           </button>
         </div>
+
+        {/* Tab Content Rendering */}
+        <div className="mt-2 min-h-[500px]">
+          {activeTab === "personal" && (
+            <motion.div
+              key="personal"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, ease: "easeOut" }}
+              className="w-full flex flex-col gap-6"
+            >
+              <h2 className="text-2xl font-bold font-[family-name:var(--font-heading)] text-white text-center mb-2">
+                 Your Active Goals
+              </h2>
+              <ShowdownCarousel isLoading={isLoadingWagers} wagers={wagers} />
+            </motion.div>
+          )}
+
+          {activeTab === "arena" && (
+            <motion.div
+              key="arena"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, ease: "easeOut" }}
+              className="w-full"
+            >
+              <h2 className="text-2xl font-bold font-[family-name:var(--font-heading)] text-white mb-6 text-center">
+                 The Arena Feed
+              </h2>
+              <ProofFeed isLoading={isLoadingFeed} posts={feed} />
+            </motion.div>
+          )}
+
+          {activeTab === "impact" && (
+            <motion.div
+              key="impact"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, ease: "easeOut" }}
+              className="w-full"
+            >
+               <ImpactSection isLoading={isLoadingImpact} claims={claims} />
+            </motion.div>
+          )}
+        </div>
+
       </div>
 
       <style jsx global>{`

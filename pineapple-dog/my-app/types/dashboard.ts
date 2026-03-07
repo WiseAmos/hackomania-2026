@@ -34,11 +34,18 @@ export interface ProofPost {
   rejections: number;
 }
 
+export interface ReliefRecipient {
+  name: string;
+  avatar: string;
+  bio: string;
+}
+
 export interface ImpactClaim {
   id: string;
   amount: number;
   wagerTitle: string;
   reliefFund: string;
+  recipient: ReliefRecipient;
   timestamp: string;
 }
 

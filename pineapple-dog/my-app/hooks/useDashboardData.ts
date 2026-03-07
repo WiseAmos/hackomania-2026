@@ -57,6 +57,11 @@ const MOCK_IMPACT_CLAIMS: ImpactClaim[] = [
     amount: 50,
     wagerTitle: "No Sugar Challenge",
     reliefFund: "Pacific Wildfire Relief",
+    recipient: {
+      name: "Maria Silva",
+      avatar: "M",
+      bio: "Recovering from the wildfires. Funding used for temporary housing."
+    },
     timestamp: "2 days ago"
   },
   {
@@ -64,6 +69,11 @@ const MOCK_IMPACT_CLAIMS: ImpactClaim[] = [
     amount: 120,
     wagerTitle: "10k Daily Run",
     reliefFund: "Earthquake Mutual Aid",
+    recipient: {
+      name: "Ahmed Hassan",
+      avatar: "A",
+      bio: "Rebuilding family bakery after the earthquake."
+    },
     timestamp: "1 week ago"
   }
 ];

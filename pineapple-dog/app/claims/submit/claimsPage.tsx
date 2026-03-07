@@ -207,17 +207,17 @@ export default function ClaimsClientPage() {
                   <div onClick={() => setImpact("property")} className={`flex flex-col items-center text-center justify-center gap-2 p-6 rounded-xl cursor-pointer transition-all border ${impact === "property" ? "bg-[#6366F1]/20 border-[#6366F1] text-white" : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10 hover:text-white"}`}>
                     <House className="w-8 h-8 mb-1" />
                     <span className="font-bold">Property Impact</span>
-                    <span className="text-xs text-slate-400">House, Cars, etc.</span>
+                    <span className="text-xs text-slate-400">Damage to residential or commercial real estate and vehicles.</span>
                   </div>
                   <div onClick={() => setImpact("presence")} className={`flex flex-col items-center text-center justify-center gap-2 p-6 rounded-xl cursor-pointer transition-all border ${impact === "presence" ? "bg-[#6366F1]/20 border-[#6366F1] text-white" : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10 hover:text-white"}`}>
                     <Locate className="w-8 h-8 mb-1" />
                     <span className="font-bold">Presence Impact</span>
-                    <span className="text-xs text-slate-400">Yourself I guess, hospital bills or something</span>
+                    <span className="text-xs text-slate-400">Personal injury, medical expenses, or evacuation costs.</span>
                   </div>
                   <div onClick={() => setImpact("livelihood")} className={`flex flex-col items-center text-center justify-center gap-2 p-6 rounded-xl cursor-pointer transition-all border ${impact === "livelihood" ? "bg-[#6366F1]/20 border-[#6366F1] text-white" : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10 hover:text-white"}`}>
                     <BriefcaseBusiness className="w-8 h-8 mb-1" />
                     <span className="font-bold">Livelihood / Economic Impact</span>
-                    <span className="text-xs text-slate-400">This more of unemployment or sudden loss of business</span>
+                    <span className="text-xs text-slate-400">Business interruption, loss of employment, or verified income loss.</span>
                   </div>
                 </div>
               </div>

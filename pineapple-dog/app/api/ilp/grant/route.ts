@@ -61,6 +61,13 @@ export async function GET(req: NextRequest) {
               identifier: wallet.id,
               type: "outgoing-payment",
               actions: ["read", "create", "list"],
+              limits: {
+                debitAmount: {
+                  value: amount?.toString() || "0",
+                  assetCode: wallet.assetCode,
+                  assetScale: wallet.assetScale,
+                },
+              },
             },
           ],
         },

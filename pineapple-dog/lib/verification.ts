@@ -16,17 +16,14 @@ export interface ClaimManifest {
     property?: {
       home_address: string;
       registry_match: boolean;
-      satellite_damage_img?: string;
     };
     presence?: {
       gps_location_logs: { lat: number; lng: number }[];
       telecom_tower_data: string;
-      geotagged_media?: string;
     };
     livelihood?: {
       business_uen: string;
       sector: string;
-      income_loss_proof?: string;
     };
   };
   votes: { count: number; voterIds: string[] };
@@ -68,6 +65,28 @@ export interface UnifiedResponse {
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { adminDb } from "./firebaseAdmin";
+
+async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error: any) {
+      if (error?.status === 429 && attempt < maxRetries - 1) {
+        let delayMs = Math.pow(2, attempt) * 2000; // default backoff
+        const match = error?.message?.match(/retry in (\d+(\.\d+)?)s/);
+        if (match) {
+           // parse exact delay from message if available, add 500ms buffer
+           delayMs = parseFloat(match[1]) * 1000 + 500;
+        }
+        console.warn(`[Rate Limit] 429 Too Many Requests. Retrying in ${delayMs.toFixed(0)}ms (Attempt ${attempt + 1}/${maxRetries})...`);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      } else {
+        throw error;
+      }
+    }
+  }
+  throw new Error("Max retries exceeded");
+}
 
 export class PDLEngine {
   private genAI: GoogleGenerativeAI;
@@ -186,7 +205,7 @@ INPUT DATA:
 ${JSON.stringify(disasterInfo, null, 2)}
     `;
 
-    const result = await model.generateContent(prompt);
+    const result = await withRetry(() => model.generateContent(prompt));
     const text = result.response.text();
     const jsonStr = text.replace(/```json|```/g, "").trim();
     console.log("[PDL-Validator] Validation Result:", jsonStr);
@@ -247,7 +266,7 @@ INPUT DATA:
 ${JSON.stringify(manifest, null, 2)}
     `;
 
-    const result = await model.generateContent(prompt);
+    const result = await withRetry(() => model.generateContent(prompt));
     const text = result.response.text();
     const jsonStr = text.replace(/```json|```/g, "").trim();
     console.log("[PDL-Engine] AI Assessment Result:", jsonStr);

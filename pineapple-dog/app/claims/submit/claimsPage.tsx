@@ -1,8 +1,7 @@
 "use client"
 import { useCallback, useEffect, useState } from "react"
 import s from "./claimsPage.module.css"
-import { ArrowLeft, BriefcaseBusiness, House, Locate, Upload, Loader2 } from 'lucide-react';
-import { useDropzone } from "react-dropzone"
+import { ArrowLeft, BriefcaseBusiness, House, Locate, Loader2 } from 'lucide-react';
 import Link from "next/link";
 import { useAuth } from "@/lib/AuthContext"
 
@@ -12,13 +11,11 @@ export default function ClaimsClientPage() {
   step 0: Claim details
   step 1: choose impact type
   step 2: category verification details
-  step 3: upload evidence
-  step 4: analyse evidence
+  step 3: analyse evidence
   */
-  const MAX_STEP = 3;
+  const MAX_STEP = 2;
 
   const [impact, setImpact] = useState<null | string>(null);
-  const [image, setImage] = useState<null | string>(null);
 
   type FormData = {
     title: string;
@@ -67,7 +64,7 @@ export default function ClaimsClientPage() {
   async function handleSubmit() {
     if (!user) return;
     setIsSubmitting(true);
-    setStep(4);
+    setStep(3);
 
     try {
       const res = await fetch("/api/claims", {
@@ -109,32 +106,6 @@ export default function ClaimsClientPage() {
 
   useEffect(() => {
   }, [impact])
-
-  function fileToBase64(file: File): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader()
-
-      reader.readAsDataURL(file)
-
-      reader.onload = () => resolve(reader.result as string)
-      reader.onerror = error => reject(error)
-    })
-  }
-
-  const onDrop = useCallback(async (acceptedFiles: File[]) => {
-    if (acceptedFiles.length === 0) return
-
-    const base64 = await fileToBase64(acceptedFiles[0])
-    setImage(base64)
-  }, [])
-
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: {
-      "image/*": []
-    },
-    maxFiles: 1
-  })
 
   // Mock scoring initially
   const recordAnalysis = 0.27
@@ -282,36 +253,6 @@ export default function ClaimsClientPage() {
             }
             {step === 3 && (
               <div className="flex flex-col gap-4">
-                <h2 className="text-xl font-bold text-[#6366F1] mb-2">Upload Evidence</h2>
-
-                <div className="space-y-4">
-                  <label className="text-sm font-bold text-white/60 ml-1">UPLOAD EVIDENCE</label>
-                  <div {...getRootProps()} className="relative group transition-all">
-                    <input {...getInputProps()} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20" />
-                    <div className={`w-full h-32 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center gap-2 transition-all ${!image
-                        ? "border-white/20 bg-slate-800 group-hover:border-[#6366F1]/50 group-hover:bg-slate-700/50"
-                        : "border-green-400 bg-green-900/20"
-                      }`}>
-                      <Upload className={`w-8 h-8 ${!image ? "text-white/20 group-hover:text-[#6366F1]/60" : "text-green-400/60"}`} />
-                      <span className={`text-sm font-bold ${!image ? "text-white/40" : "text-green-400/60"}`}>
-                        {image ? "File selected" : "Choose file or drag & drop"}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {image && (
-                  <div className="mt-6 flex flex-col gap-3">
-                    <h3 className="text-sm font-bold text-white/60 ml-1">PREVIEW</h3>
-                    <div className="rounded-2xl overflow-hidden border border-white/10 bg-black/40">
-                      <img src={image} alt="evidence" className="w-full h-auto max-h-[300px] object-contain" />
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-            {step === 4 && (
-              <div className="flex flex-col gap-4">
                 <h2 className="text-xl font-bold text-[#6366F1] mb-6">{isSubmitting ? "Verifying Claim..." : "Verification Result"}</h2>
 
                 {isSubmitting ? (
@@ -433,7 +374,6 @@ export default function ClaimsClientPage() {
               </div>
             )}
           </div>
-          {step < 4 && (
             <div className="flex justify-between items-center mt-10 pt-6 border-t border-white/10">
               <button disabled={step === 0} onClick={decrementStep} className="px-6 py-2.5 rounded-xl font-bold text-sm bg-white/5 text-white hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-white/5 transition-all">
                 Previous
@@ -444,12 +384,11 @@ export default function ClaimsClientPage() {
                   Next
                 </button>
               ) : (
-                <button onClick={handleSubmit} disabled={isSubmitting || !image} className="px-8 py-2.5 rounded-xl font-bold text-sm bg-[#10B981] text-white hover:bg-[#059669] shadow-[0_0_20px_rgba(16,185,129,0.3)] transition-all disabled:opacity-50">
+                <button onClick={handleSubmit} disabled={isSubmitting} className="px-8 py-2.5 rounded-xl font-bold text-sm bg-[#10B981] text-white hover:bg-[#059669] shadow-[0_0_20px_rgba(16,185,129,0.3)] transition-all disabled:opacity-50">
                   {isSubmitting ? "Submitting..." : "Submit Claim"}
                 </button>
               )}
             </div>
-          )}
         </div>
       </div>
     </main>

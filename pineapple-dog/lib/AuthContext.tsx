@@ -49,7 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                             uid: fbUser.uid,
                             name: fbUser.displayName || "Anonymous",
                             email: fbUser.email || "",
-                            avatar: fbUser.displayName?.charAt(0).toUpperCase() || "?",
+                            avatar: fbUser.photoURL || fbUser.displayName?.charAt(0).toUpperCase() || "?",
                             handle: `@${(fbUser.displayName || "user").toLowerCase().replace(/\s+/g, "")}`,
                         });
                     }
@@ -58,7 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                         uid: fbUser.uid,
                         name: fbUser.displayName || "Anonymous",
                         email: fbUser.email || "",
-                        avatar: fbUser.displayName?.charAt(0).toUpperCase() || "?",
+                        avatar: fbUser.photoURL || fbUser.displayName?.charAt(0).toUpperCase() || "?",
                         handle: `@${(fbUser.displayName || "user").toLowerCase().replace(/\s+/g, "")}`,
                     });
                 }

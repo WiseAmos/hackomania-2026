@@ -25,7 +25,7 @@ export function ChallengeCard({ type, data, onAction }: ChallengeCardProps) {
   const caption = isPost ? post?.caption : wager?.description;
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       className="bg-slate-800 border border-white/5 rounded-2xl md:rounded-[2rem] overflow-hidden shadow-2xl flex flex-row md:flex-col relative group h-full"
@@ -35,17 +35,17 @@ export function ChallengeCard({ type, data, onAction }: ChallengeCardProps) {
 
       {/* Proof Snapshot Thumbnail */}
       <div className="w-28 sm:w-36 md:w-full aspect-square md:aspect-[4/3] bg-slate-900 overflow-hidden relative shrink-0">
-        <img 
-          src={photoUrl} 
-          alt="Thumbnail" 
+        <img
+          src={photoUrl}
+          alt="Thumbnail"
           className={`w-full h-full object-cover transition-transform duration-700 ${isPost ? "group-hover:scale-105" : "grayscale opacity-40"}`}
           loading="lazy"
         />
-        
+
         {!isPost && (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20">
-               <Camera className="w-5 h-5 text-white/40" />
+              <Camera className="w-5 h-5 text-white/40" />
             </div>
           </div>
         )}
@@ -85,17 +85,17 @@ export function ChallengeCard({ type, data, onAction }: ChallengeCardProps) {
 
           {/* Mobile Stats Row */}
           <div className="flex md:hidden items-center gap-2 mb-2 overflow-x-auto no-scrollbar pb-0.5">
-             <div className="flex items-center h-5 bg-slate-700/50 px-1.5 rounded border border-white/5 whitespace-nowrap gap-1">
-               {!isPost && <Clock className="w-2.5 h-2.5 text-slate-400" />}
-               <span className="text-[8px] text-white/50 font-bold leading-none">{timestamp}</span>
-             </div>
-             <div className="flex items-center h-5 bg-slate-700/50 px-1.5 rounded border border-white/5 shrink-0 whitespace-nowrap gap-1">
-               <Users className="w-2.5 h-2.5 text-slate-400" />
-               <span className="text-[8px] font-bold text-white/70 leading-none">{isPost ? (post!.verifications % 8) + 2 : wager!.participants.length}</span>
-             </div>
-             <div className={`flex items-center h-5 px-1.5 rounded border shrink-0 whitespace-nowrap ${isPost ? "bg-[#10B981]/15 border-[#10B981]/10" : "bg-[#6366F1]/15 border-[#6366F1]/10"}`}>
-               <span className={`text-[8px] font-bold leading-none ${isPost ? "text-[#10B981]" : "text-[#6366F1]"}`}>S${stake}</span>
-             </div>
+            <div className="flex items-center h-5 bg-slate-700/50 px-1.5 rounded border border-white/5 whitespace-nowrap gap-1">
+              {!isPost && <Clock className="w-2.5 h-2.5 text-slate-400" />}
+              <span className="text-[8px] text-white/50 font-bold leading-none">{timestamp}</span>
+            </div>
+            <div className="flex items-center h-5 bg-slate-700/50 px-1.5 rounded border border-white/5 shrink-0 whitespace-nowrap gap-1">
+              <Users className="w-2.5 h-2.5 text-slate-400" />
+              <span className="text-[8px] font-bold text-white/70 leading-none">{isPost ? (post!.verifications % 8) + 2 : (wager!.participants?.length || 2)}</span>
+            </div>
+            <div className={`flex items-center h-5 px-1.5 rounded border shrink-0 whitespace-nowrap ${isPost ? "bg-[#10B981]/15 border-[#10B981]/10" : "bg-[#6366F1]/15 border-[#6366F1]/10"}`}>
+              <span className={`text-[8px] font-bold leading-none ${isPost ? "text-[#10B981]" : "text-[#6366F1]"}`}>S${stake}</span>
+            </div>
           </div>
 
           <p className="text-slate-300 text-[11px] md:text-[13px] italic leading-snug md:leading-relaxed line-clamp-2 mb-2 md:mb-4">
@@ -104,7 +104,7 @@ export function ChallengeCard({ type, data, onAction }: ChallengeCardProps) {
         </div>
 
         <div className="mt-auto">
-          <button 
+          <button
             onClick={() => onAction(data)}
             className={`w-full flex items-center justify-center gap-1.5 md:gap-2 text-white py-1.5 md:py-3 rounded-xl md:rounded-2xl font-bold transition-all text-[11px] md:text-sm hover:-translate-y-0.5 shadow-2xl active:scale-95 bg-gradient-to-r ${isPost ? "from-[#6366F1] to-[#8B5CF6] shadow-[#6366F1]/20" : "from-[#FF4D4D] to-[#6366F1] shadow-[#FF4D4D]/20"}`}
           >

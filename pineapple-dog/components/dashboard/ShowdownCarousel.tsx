@@ -33,13 +33,7 @@ export function ShowdownCarousel({ isLoading, wagers }: Props) {
                   <Clock className="w-3 h-3" /> {wager.timeRemaining}
                 </div>
               </div>
-<<<<<<< Updated upstream:pineapple-dog/components/dashboard/ShowdownCarousel.tsx
-
               <h3 className="font-[family-name:var(--font-heading)] text-lg sm:text-xl font-bold text-white leading-tight mb-4">
-=======
-              
-              <h3 className="font-[family-name:var(--font-heading)] text-sm sm:text-base font-bold text-white leading-tight mb-2 truncate">
->>>>>>> Stashed changes:pineapple-dog/my-app/components/dashboard/ShowdownCarousel.tsx
                 {wager.title}
               </h3>
 
@@ -47,15 +41,9 @@ export function ShowdownCarousel({ isLoading, wagers }: Props) {
               <div className="flex items-center gap-3">
                 <div className="flex -space-x-1.5">
                   {(wager.participants || [wager.player1, wager.player2]).map((p, i) => (
-<<<<<<< Updated upstream:pineapple-dog/components/dashboard/ShowdownCarousel.tsx
                     <div
                       key={i}
                       className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full border-2 border-slate-800 flex items-center justify-center text-xs sm:text-sm font-bold shadow-md
-=======
-                    <div 
-                      key={i} 
-                      className={`w-6 h-6 sm:w-7 sm:h-7 rounded-full border-2 border-slate-800 flex items-center justify-center text-[10px] font-bold shadow-sm
->>>>>>> Stashed changes:pineapple-dog/my-app/components/dashboard/ShowdownCarousel.tsx
                         ${p.status === 'alive' ? 'bg-[#6366F1] text-white' : 'bg-slate-700 text-slate-500 opacity-50 grayscale'}
                       `}
                       title={`${p.name} (${p.status})`}

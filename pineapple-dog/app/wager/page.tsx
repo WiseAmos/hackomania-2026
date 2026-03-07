@@ -30,14 +30,25 @@ export default function WagerPage() {
     const [stakeAmount, setStakeAmount] = useState("");
     const [deadline, setDeadline] = useState("");
     const [myWallet, setMyWallet] = useState("");
-    const [opponentWallet, setOpponentWallet] = useState("");
+    const [opponentUser, setOpponentUser] = useState<any>(null); // Replaces opponentWallet
+    const [users, setUsers] = useState<any[]>([]);
+    const [searchQuery, setSearchQuery] = useState("");
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const [imageUrl, setImageUrl] = useState("");
 
-    // Handle Fynbos redirect callback
+    // Fetch users on mount for the autocomplete dropdown
+    useEffect(() => {
+        fetch("/api/users")
+            .then(res => res.json())
+            .then(data => setUsers(data))
+            .catch(err => console.error("Failed to fetch users", err));
+    }, []);
+
+    // 1. Handle Fynbos redirect callback (Capture interaction)
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         const interactRef = params.get("interact_ref");
         const hash = params.get("hash");
-        const player = params.get("player");
         const returnedWagerId = params.get("wagerId");
 
         // Restore form state from session
@@ -49,15 +60,12 @@ export default function WagerPage() {
             setStakeAmount(parsed.stakeAmount || "");
             setDeadline(parsed.deadline || "");
             setMyWallet(parsed.myWallet || "");
-            setOpponentWallet(parsed.opponentWallet || "");
+            setOpponentUser(parsed.opponentUser || null);
+            setImageUrl(parsed.imageUrl || "");
         }
 
         if (interactRef && hash && returnedWagerId) {
-            setWagerId(returnedWagerId);
-
-            // Retrieve stored grantId
             const grantId = sessionStorage.getItem("pendingGrantId");
-            const restored = savedForm ? JSON.parse(savedForm) : {};
 
             if (grantId) {
                 // Send interact_ref to backend to finalize the grant
@@ -67,44 +75,8 @@ export default function WagerPage() {
                     body: JSON.stringify({ grantId, interact_ref: interactRef, hash }),
                 })
                     .then((res) => res.json())
-                    .then(async () => {
-                        // Persist the wager in RTDB
-                        try {
-                            await fetch("/api/wagers", {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({
-                                    title: restored.title || "Untitled Showdown",
-                                    description: restored.description || "",
-                                    deadline: restored.deadline || "",
-                                    stakeAmount: parseFloat(restored.stakeAmount || "0"),
-                                    wagerId: returnedWagerId,
-                                    grantId,
-                                    player1: {
-                                        uid: user?.uid || "",
-                                        name: user?.name || "Player 1",
-                                        avatar: user?.avatar || "?",
-                                        handle: user?.handle || "",
-                                        walletAddress: restored.myWallet || "",
-                                    },
-                                    player2: {
-                                        walletAddress: restored.opponentWallet || "",
-                                    },
-                                }),
-                            });
-                        } catch (e) {
-                            console.error("Failed to persist wager:", e);
-                        }
-
-                        sessionStorage.removeItem("pendingGrantId");
-                        sessionStorage.removeItem("pendingShowdown");
-                        setStep("authorized");
-                        // Clean URL
-                        window.history.replaceState(
-                            {},
-                            document.title,
-                            window.location.pathname
-                        );
+                    .then(() => {
+                        setWagerId(returnedWagerId); // This triggers the next effect
                     })
                     .catch((err) => {
                         console.error("Failed to capture interact_ref", err);
@@ -112,11 +84,55 @@ export default function WagerPage() {
                     });
             }
         }
-    }, [user]);
+    }, []);
+
+    // 2. Persist wager once we have the Wager ID AND the User is fully loaded
+    useEffect(() => {
+        if (wagerId && user) {
+            const savedForm = sessionStorage.getItem("pendingShowdown");
+            const restored = savedForm ? JSON.parse(savedForm) : {};
+            const grantId = sessionStorage.getItem("pendingGrantId");
+
+            fetch("/api/wagers", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    title: restored.title || "Untitled Showdown",
+                    description: restored.description || "",
+                    deadline: restored.deadline || "",
+                    stakeAmount: parseFloat(restored.stakeAmount || "0"),
+                    wagerId: wagerId,
+                    grantId,
+                    imageUrl: restored.imageUrl || "",
+                    player1: {
+                        uid: user.uid,
+                        name: user.name,
+                        avatar: user.avatar,
+                        handle: user.handle,
+                        walletAddress: restored.myWallet || "",
+                    },
+                    player2: {
+                        uid: opponentUser?.uid || "",
+                        name: opponentUser?.name || "Opponent",
+                        avatar: opponentUser?.avatar || "?",
+                        handle: opponentUser?.handle || "",
+                        walletAddress: opponentUser?.walletAddress || restored.opponentWallet || "",
+                    },
+                }),
+            })
+                .then(() => {
+                    sessionStorage.removeItem("pendingGrantId");
+                    sessionStorage.removeItem("pendingShowdown");
+                    setStep("authorized");
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                })
+                .catch(e => console.error("Failed to persist wager:", e));
+        }
+    }, [wagerId, user]);
 
     const handleCreateShowdown = async () => {
-        if (!title || !stakeAmount || !myWallet || !opponentWallet || !deadline) {
-            setError("Please fill in all fields");
+        if (!title || !stakeAmount || !myWallet || !opponentUser || !deadline) {
+            setError("Please fill in all fields and select an opponent");
             return;
         }
 
@@ -135,7 +151,9 @@ export default function WagerPage() {
                     stakeAmount,
                     deadline,
                     myWallet,
-                    opponentWallet,
+                    opponentWallet: opponentUser.walletAddress,
+                    opponentUser,
+                    imageUrl,
                 })
             );
 
@@ -146,7 +164,7 @@ export default function WagerPage() {
                 title,
                 description,
                 deadline,
-                opponentWallet,
+                opponentWallet: opponentUser.walletAddress,
             });
 
             const res = await fetch(`/api/ilp/grant?${params}`);
@@ -251,6 +269,63 @@ export default function WagerPage() {
                                     />
                                 </div>
 
+                                {/* Banner Image Upload */}
+                                <div>
+                                    <label className="block text-slate-400 text-xs uppercase tracking-wider mb-2 font-semibold">
+                                        Showdown Banner Image
+                                        <span className="text-slate-600 ml-1">(optional)</span>
+                                    </label>
+                                    <div className="flex items-center gap-4">
+                                        <label className={`relative flex items-center justify-center w-28 h-20 rounded-xl border-2 border-dashed ${imageUrl ? 'border-[#6366F1] bg-[#6366F1]/10' : 'border-slate-700 bg-slate-900/50 hover:bg-slate-800'} cursor-pointer group overflow-hidden transition-all`}>
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                className="hidden"
+                                                onChange={(e) => {
+                                                    const file = e.target.files?.[0];
+                                                    if (!file) return;
+                                                    // Resize and compress string logic inline
+                                                    const reader = new FileReader();
+                                                    reader.onload = (event) => {
+                                                        const img = new Image();
+                                                        img.onload = () => {
+                                                            const canvas = document.createElement('canvas');
+                                                            const ctx = canvas.getContext('2d');
+                                                            const MAX_WIDTH = 800;
+                                                            const MAX_HEIGHT = 800;
+                                                            let width = img.width;
+                                                            let height = img.height;
+                                                            if (width > height) {
+                                                                if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
+                                                            } else {
+                                                                if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; }
+                                                            }
+                                                            canvas.width = width;
+                                                            canvas.height = height;
+                                                            ctx?.drawImage(img, 0, 0, width, height);
+                                                            const compressed = canvas.toDataURL("image/jpeg", 0.7);
+                                                            setImageUrl(compressed);
+                                                        };
+                                                        img.src = event.target?.result as string;
+                                                    };
+                                                    reader.readAsDataURL(file);
+                                                }}
+                                            />
+                                            {imageUrl ? (
+                                                <img src={imageUrl} alt="Banner Preview" className="absolute inset-0 w-full h-full object-cover" />
+                                            ) : (
+                                                <div className="flex flex-col items-center justify-center text-slate-500 group-hover:text-white transition-colors">
+                                                    <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                                                    <span className="text-[10px] font-bold">Upload</span>
+                                                </div>
+                                            )}
+                                        </label>
+                                        <div className="flex-1 text-xs text-slate-500 leading-snug">
+                                            Upload an image to make this challenge stand out on the Arena feed. Square or landscape images work best.
+                                        </div>
+                                    </div>
+                                </div>
+
                                 {/* Amount + Deadline */}
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
@@ -301,18 +376,103 @@ export default function WagerPage() {
                                             className="w-full bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder:text-slate-500 focus:outline-none focus:border-[#6366F1]/60 focus:ring-1 focus:ring-[#6366F1]/30 transition-all"
                                         />
                                     </div>
-                                    <div>
+                                    <div className="relative">
                                         <label className="block text-slate-400 text-xs uppercase tracking-wider mb-2 font-semibold">
                                             <Swords className="w-3 h-3 inline mr-1" />
-                                            Opponent&apos;s Wallet Address
+                                            Opponent Search
                                         </label>
-                                        <input
-                                            type="text"
-                                            value={opponentWallet}
-                                            onChange={(e) => setOpponentWallet(e.target.value)}
-                                            placeholder="$ilp.interledger-test.dev/opponent"
-                                            className="w-full bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder:text-slate-500 focus:outline-none focus:border-[#6366F1]/60 focus:ring-1 focus:ring-[#6366F1]/30 transition-all"
-                                        />
+
+                                        {opponentUser ? (
+                                            <div className="w-full bg-slate-900 border border-[#6366F1]/50 rounded-xl px-4 py-3 flex items-center justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-xs font-bold overflow-hidden">
+                                                        {opponentUser.avatar?.startsWith('http') ? (
+                                                            <img src={opponentUser.avatar} alt="avatar" className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            opponentUser.avatar
+                                                        )}
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-white text-sm font-semibold leading-tight">{opponentUser.name}</div>
+                                                        <div className="text-slate-500 text-xs">@{opponentUser.handle}</div>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={() => setOpponentUser(null)}
+                                                    className="text-slate-400 hover:text-white p-1"
+                                                >
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <div className="relative">
+                                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                        <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                                                    </div>
+                                                    <input
+                                                        type="text"
+                                                        value={searchQuery}
+                                                        onChange={(e) => {
+                                                            setSearchQuery(e.target.value);
+                                                            setIsDropdownOpen(true);
+                                                        }}
+                                                        onFocus={() => setIsDropdownOpen(true)}
+                                                        placeholder="Search user by name or handle..."
+                                                        className="w-full bg-slate-900 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-white text-sm placeholder:text-slate-500 focus:outline-none focus:border-[#6366F1]/60 focus:ring-1 focus:ring-[#6366F1]/30 transition-all"
+                                                    />
+                                                </div>
+
+                                                {/* Autocomplete Dropdown */}
+                                                <AnimatePresence>
+                                                    {isDropdownOpen && searchQuery && (
+                                                        <motion.div
+                                                            initial={{ opacity: 0, y: -5 }}
+                                                            animate={{ opacity: 1, y: 0 }}
+                                                            exit={{ opacity: 0, y: -5 }}
+                                                            className="absolute z-50 w-full mt-2 bg-slate-800 border border-white/10 rounded-xl shadow-2xl max-h-60 overflow-y-auto custom-scrollbar"
+                                                        >
+                                                            {users.filter(u =>
+                                                                (u.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                                                    u.handle?.toLowerCase().includes(searchQuery.toLowerCase())) &&
+                                                                u.uid !== user?.uid // don't show self
+                                                            ).map(u => (
+                                                                <button
+                                                                    key={u.uid}
+                                                                    onClick={() => {
+                                                                        setOpponentUser(u);
+                                                                        setSearchQuery("");
+                                                                        setIsDropdownOpen(false);
+                                                                    }}
+                                                                    className="w-full text-left flex items-center gap-3 px-4 py-3 hover:bg-slate-700/50 transition-colors border-b border-white/5 last:border-0"
+                                                                >
+                                                                    <div className="w-8 h-8 rounded-full bg-slate-900 flex items-center justify-center text-xs font-bold shrink-0 overflow-hidden">
+                                                                        {u.avatar?.startsWith('http') ? (
+                                                                            <img src={u.avatar} alt="avatar" className="w-full h-full object-cover" />
+                                                                        ) : (
+                                                                            u.avatar
+                                                                        )}
+                                                                    </div>
+                                                                    <div>
+                                                                        <div className="text-white text-sm font-semibold">{u.name}</div>
+                                                                        <div className="text-slate-400 text-xs">@{u.handle}</div>
+                                                                    </div>
+                                                                </button>
+                                                            ))}
+                                                            {users.filter(u =>
+                                                                (u.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                                                    u.handle?.toLowerCase().includes(searchQuery.toLowerCase())) &&
+                                                                u.uid !== user?.uid
+                                                            ).length === 0 && (
+                                                                    <div className="px-4 py-3 text-sm text-slate-500 text-center">
+                                                                        No users found
+                                                                    </div>
+                                                                )}
+                                                        </motion.div>
+                                                    )}
+                                                </AnimatePresence>
+                                            </>
+                                        )}
                                     </div>
                                 </div>
 
@@ -352,7 +512,7 @@ export default function WagerPage() {
                                         !title ||
                                         !stakeAmount ||
                                         !myWallet ||
-                                        !opponentWallet ||
+                                        !opponentUser ||
                                         !deadline
                                     }
                                     className="w-full bg-[#6366F1] hover:bg-[#4F46E5] disabled:opacity-40 disabled:cursor-not-allowed text-white py-3.5 rounded-xl font-[family-name:var(--font-heading)] font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-[0_0_24px_rgba(99,102,241,0.4)] hover:-translate-y-0.5 active:scale-[0.98]"
@@ -439,7 +599,8 @@ export default function WagerPage() {
                                         setStakeAmount("");
                                         setDeadline("");
                                         setMyWallet("");
-                                        setOpponentWallet("");
+                                        setOpponentUser(null);
+                                        setImageUrl("");
                                     }}
                                     className="bg-[#6366F1] hover:bg-[#4F46E5] text-white px-6 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-[0_0_16px_rgba(99,102,241,0.3)]"
                                 >

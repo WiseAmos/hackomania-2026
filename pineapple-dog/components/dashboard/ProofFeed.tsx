@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Users, HandCoins, AlertCircle } from "lucide-react";
+import { useAuth } from "../../lib/AuthContext";
 import { ProofPost, Wager } from "../../types/dashboard";
 import { RaiseStakesModal } from "./RaiseStakesModal";
 import { ChallengeCard } from "./ChallengeCard";
@@ -14,7 +15,18 @@ interface Props {
 }
 
 export function ProofFeed({ isLoading, posts, allWagers, onRaiseStakes }: Props) {
-  const [activeFeedTab, setActiveFeedTab] = useState<"following" | "trending" | "global">("global");
+  const { user } = useAuth();
+  const [activeFeedTab, setActiveFeedTab] = useState<"friends" | "global">("global");
+  const [friends, setFriends] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    if (user?.uid) {
+      fetch(`/api/users/friends?uid=${user.uid}`)
+        .then(res => res.json())
+        .then(data => setFriends(data || {}))
+        .catch(err => console.error("Failed to load friends", err));
+    }
+  }, [user]);
 
   if (isLoading) {
     return (
@@ -25,12 +37,13 @@ export function ProofFeed({ isLoading, posts, allWagers, onRaiseStakes }: Props)
     );
   }
 
-  // Simple filter logic for demonstration
-  const filteredPosts = activeFeedTab === "following"
-    ? posts
-    : activeFeedTab === "trending"
-      ? [...posts].sort((a, b) => b.verifications - a.verifications)
-      : [...posts].reverse();
+  const globalWagers = allWagers.filter(wager => {
+    return wager.player1?.uid !== user?.uid && wager.player2?.uid !== user?.uid;
+  });
+
+  const friendsWagers = globalWagers.filter(wager => {
+    return friends[wager.player1?.uid] || (wager.player2?.uid && friends[wager.player2?.uid]);
+  });
 
   // Zero State for new users
   if (posts.length === 0 && allWagers.length === 0) {
@@ -51,17 +64,13 @@ export function ProofFeed({ isLoading, posts, allWagers, onRaiseStakes }: Props)
       {/* Toggles */}
       <div className="flex bg-slate-800/50 p-1.5 rounded-full border border-white/5 w-max mx-auto mb-6">
         <button
-          onClick={() => setActiveFeedTab("following")}
-          className={`px-4 py-1.5 rounded-full text-sm font-bold transition-all flex items-center gap-2 ${activeFeedTab === "following" ? "bg-slate-700 text-white shadow" : "text-slate-400 hover:text-white"}`}
+          onClick={() => setActiveFeedTab("friends")}
+          className={`px-4 py-1.5 rounded-full text-sm font-bold transition-all flex items-center gap-2 ${activeFeedTab === "friends" ? "bg-slate-700 text-white shadow" : "text-slate-400 hover:text-white"}`}
         >
-          Following
-          <span className="text-[10px] bg-white/10 px-1.5 py-0.5 rounded-full">{posts.length}</span>
-        </button>
-        <button
-          onClick={() => setActiveFeedTab("trending")}
-          className={`px-4 py-1.5 rounded-full text-sm font-bold transition-all flex items-center gap-2 ${activeFeedTab === "trending" ? "bg-slate-700 text-white shadow" : "text-slate-400 hover:text-white"}`}
-        >
-          Trending
+          Friends
+          {friendsWagers.length > 0 && (
+            <span className="text-[10px] bg-white/10 px-1.5 py-0.5 rounded-full">{friendsWagers.length}</span>
+          )}
         </button>
         <button
           onClick={() => setActiveFeedTab("global")}
@@ -74,7 +83,16 @@ export function ProofFeed({ isLoading, posts, allWagers, onRaiseStakes }: Props)
       {/* Posts Grid Container */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6 px-3 md:px-0">
         {activeFeedTab === "global" ? (
-          allWagers.map((wager) => (
+          globalWagers.map((wager) => (
+            <ChallengeCard
+              key={wager.id}
+              type="active-goal"
+              data={wager}
+              onAction={(data) => onRaiseStakes(data as Wager)}
+            />
+          ))
+        ) : friendsWagers.length > 0 ? (
+          friendsWagers.map((wager) => (
             <ChallengeCard
               key={wager.id}
               type="active-goal"
@@ -83,18 +101,9 @@ export function ProofFeed({ isLoading, posts, allWagers, onRaiseStakes }: Props)
             />
           ))
         ) : (
-          filteredPosts.map((post) => (
-            <ChallengeCard
-              key={post.id}
-              type="post"
-              data={post}
-              onAction={(data) => {
-                const p = data as ProofPost;
-                const w = allWagers.find((tw) => tw.id === p.wager.id);
-                if (w) onRaiseStakes(w);
-              }}
-            />
-          ))
+          <div className="col-span-full py-20 text-center">
+            <p className="text-slate-500 font-medium">None of your friends have wagers right now. Add some friends or check the Global feed!</p>
+          </div>
         )}
       </div>
     </div>

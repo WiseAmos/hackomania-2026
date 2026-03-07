@@ -1,7 +1,7 @@
 "use client"
 import { useCallback, useEffect, useState } from "react"
 import s from "./claimsPage.module.css"
-import { BriefcaseBusiness, House, Locate } from 'lucide-react';
+import { ArrowLeft, BriefcaseBusiness, House, Locate } from 'lucide-react';
 import { useDropzone } from "react-dropzone"
 import { useAuth } from "@/lib/AuthContext"
 import Link from "next/link"
@@ -188,13 +188,100 @@ export default function ClaimsClientPage(
           <div className={s.uploadEvidence}>
             <h2 className={s.header}>Upload Evidence</h2>
 
-            <div {...getRootProps()} className={s.evidence}>
-              <input {...getInputProps()} />
+        {/* Nav */}
+        <nav className="w-full flex justify-between items-center py-6 px-6 md:px-10 border-b border-white/5 bg-slate-900/80 backdrop-blur-xl sticky top-0 z-50">
+            <Link
+                href="/dashboard"
+                className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
+            >
+                <ArrowLeft className="w-4 h-4" />
+                <span className="text-sm font-medium">Back to Dashboard</span>
+            </Link>
 
-              {isDragActive ? (
-                <p>Drop the image here…</p>
-              ) : (
-                <p>Drag & drop an image here, or click to select</p>
+        </nav>
+        <div className={s.modal}>
+          <div className={s.claimsPage}>
+            <h1 className={s.title}>Submit a claim</h1>
+            <div className={s.stepFrame}>
+              {step === 0 && 
+                <div className={s.activeDisaster}>
+                  <h2 className={s.header}>Select active disaster ({currentDisasters.length} results)</h2>
+                  <div className={s.disasterList}>
+                    {currentDisasters.map((d) => <div key={d} onClick={() => setDisaster(d)} className={`${s.listItem} ${disaster === d && s.active}`}>{d}</div>)}
+                  </div>
+                </div>
+              }
+              {step === 1 && 
+                <div className={s.impactType}>
+                  <h2 className={s.header}>Choose Impact Type</h2>
+                  <div className={s.impactList}>
+                    <div onClick={() => setImpact("property")} className={`${s.impactItem} ${s.listItem}`}>
+                      <House />
+                      Property
+                    </div>
+                    <div onClick={() => setImpact("presence")} className={`${s.impactItem} ${s.listItem}`}>
+                      <Locate />
+                      Presence
+                    </div>
+                    <div onClick={() => setImpact("livelihood")} className={`${s.impactItem} ${s.listItem}`}>
+                      <BriefcaseBusiness />
+                      Livelihood
+                    </div>
+                  </div>
+                </div>
+              }
+              {step === 2 && (
+                <div className={s.uploadEvidence}>
+                  <h2 className={s.header}>Upload Evidence</h2>
+
+                  <div {...getRootProps()} className={s.evidence}>
+                    <input {...getInputProps()} />
+
+                    {isDragActive ? (
+                      <p>Drop the image here…</p>
+                    ) : (
+                      <p>Drag & drop an image here, or click to select</p>
+                    )}
+                  </div>
+
+                  {image && (
+                    <div className={s.preview}>
+                      <h3>Preview</h3>
+                      <img src={image} alt="evidence" className={s.previewImage} />
+                    </div>
+                  )}
+                </div>
+              )}
+              {step === 3 && (
+                <div className={s.analyseEvidence}>
+                  <h2 className={s.header}>Score</h2>
+                  <div className={s.scores}>
+                    <div className={s.score}>
+                      <div className={s.scoreHeader}>Records Analysis</div>
+                      <div className={s.scoreBox}>
+                        <div className={s.scoreText}>
+                          {recordAnalysis}
+                        </div>
+                      </div>
+                    </div>
+                    <div className={s.score}>
+                      <div className={s.scoreHeader}>GPS Data</div>
+                      <div className={s.scoreBox}>
+                        <div className={s.scoreText}>
+                          {recordAnalysis}
+                        </div>
+                      </div>
+                    </div>
+                    <div className={s.score}>
+                      <div className={s.scoreHeader}>Business Registry</div>
+                      <div className={s.scoreBox}>
+                        <div className={s.scoreText}>
+                          {businessAnalysis}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
 
@@ -293,3 +380,6 @@ export default function ClaimsClientPage(
   )
 }
 
+
+
+    

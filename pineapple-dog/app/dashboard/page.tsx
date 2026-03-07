@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { LogOut, Plus, Wallet, Award, Loader2, User } from "lucide-react";
+import { LogOut, Plus, Wallet, Award, Loader2, User, Users } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../lib/AuthContext";
 import { useActiveShowdowns, useArenaFeed, useImpactPortfolio } from "../../hooks/useDashboardData";
 import { ProofSubmissionModal } from "../../components/dashboard/ProofSubmissionModal";
 import { ProofFeed } from "../../components/dashboard/ProofFeed";
+import { FriendsModal } from "../../components/dashboard/FriendsModal";
 import { ImpactSection } from "../../components/dashboard/ImpactSection";
 import { ChallengeCard } from "../../components/dashboard/ChallengeCard";
 import { RaiseStakesModal } from "../../components/dashboard/RaiseStakesModal";
@@ -43,6 +44,7 @@ export default function ArenaDashboardLayout() {
   const [selectedRaisingWager, setSelectedRaisingWager] = useState<Wager | null>(null);
   const [isProveModalOpen, setIsProveModalOpen] = useState(false);
   const [selectedWagerPrompt, setSelectedWagerPrompt] = useState<Wager | null>(null);
+  const [isFriendsModalOpen, setIsFriendsModalOpen] = useState(false);
 
   // Show loading spinner while checking auth
   if (loading) {
@@ -114,10 +116,13 @@ export default function ArenaDashboardLayout() {
         </div>
 
         <div className="flex items-center gap-3 sm:gap-6">
-          <div className="bg-slate-800 border border-white/10 rounded-full px-4 sm:px-5 py-2 flex items-center gap-2 sm:gap-3 shadow-inner">
-            <Wallet className="w-3.5 h-3.5 text-[#06B6D4]" />
+          <button
+            onClick={() => setIsFriendsModalOpen(true)}
+            className="bg-slate-800 hover:bg-slate-700 border border-white/10 rounded-full px-4 py-2.5 flex items-center gap-2 shadow-inner transition-colors"
+          >
+            <Users className="w-4 h-4 text-[#06B6D4]" />
             <span className="font-bold text-xs sm:text-sm text-[#06B6D4]">
-              {user.walletAddress ? "Connected" : "No Wallet"}
+              Friends
             </span>
           </div>
           <Link href="/wager" className="bg-[#6366F1] hover:bg-[#4F46E5] text-white px-4 sm:px-5 py-2.5 rounded-full font-[family-name:var(--font-heading)] font-bold text-xs sm:text-sm flex items-center gap-2 transition-all shadow-[0_0_24px_rgba(99,102,241,0.4)] hover:-translate-y-0.5 active:scale-95 whitespace-nowrap">
@@ -272,6 +277,12 @@ export default function ArenaDashboardLayout() {
         isOpen={isProveModalOpen}
         onClose={() => setIsProveModalOpen(false)}
         wager={selectedWagerPrompt}
+      />
+
+      <FriendsModal
+        isOpen={isFriendsModalOpen}
+        onClose={() => setIsFriendsModalOpen(false)}
+        currentUserUid={user.uid}
       />
 
       <style jsx global>{`

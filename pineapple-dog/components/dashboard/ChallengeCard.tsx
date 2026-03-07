@@ -38,17 +38,10 @@ export function ChallengeCard({ type, data, onAction }: ChallengeCardProps) {
         <img
           src={photoUrl}
           alt="Thumbnail"
-          className={`w-full h-full object-cover transition-transform duration-700 ${isPost ? "group-hover:scale-105" : "grayscale opacity-40"}`}
+          className={`w-full h-full object-cover transition-transform duration-700 group-hover:scale-105`}
           loading="lazy"
         />
 
-        {!isPost && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20">
-              <Camera className="w-5 h-5 text-white/40" />
-            </div>
-          </div>
-        )}
 
         {/* Overlaid Data Column (Desktop Only) */}
         <div className="hidden md:flex absolute top-3 right-3 z-20 flex flex-col gap-1.5 items-end">

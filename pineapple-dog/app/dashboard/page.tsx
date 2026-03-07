@@ -124,6 +124,10 @@ export default function ArenaDashboardLayout() {
             <User className="w-4 h-4" />
             Profile & KYC
           </Link>
+          <Link href="/claims" className="hidden lg:flex bg-slate-800 hover:bg-slate-700 text-white/90 px-4 sm:px-5 py-2.5 rounded-full font-[family-name:var(--font-heading)] font-bold text-xs sm:text-sm items-center gap-2 transition-all border border-white/5 whitespace-nowrap">
+            <Award className="w-4 h-4" />
+            Review Claims
+          </Link>
           <Link href="/wager" className="bg-[#6366F1] hover:bg-[#4F46E5] text-white px-4 sm:px-5 py-2.5 rounded-full font-[family-name:var(--font-heading)] font-bold text-xs sm:text-sm flex items-center gap-2 transition-all shadow-[0_0_24px_rgba(99,102,241,0.4)] hover:-translate-y-0.5 active:scale-95 whitespace-nowrap">
             <Plus className="w-4 h-4" />
             New Showdown
@@ -249,13 +253,23 @@ export default function ArenaDashboardLayout() {
 
         <button
           onClick={() => setActiveTab("impact")}
-          className={`flex-1 flex flex-col items-center gap-1 py-3 px-2 rounded-full transition-all ${activeTab === "impact" ? "bg-[#10B981] text-white" : "text-slate-400 hover:text-[#10B981]/80"}`}
+          className={`hidden sm:flex flex-1 flex flex-col items-center gap-1 py-3 px-2 rounded-full transition-all ${activeTab === "impact" ? "bg-[#10B981] text-white" : "text-slate-400 hover:text-[#10B981]/80"}`}
         >
           <div className="p-1 rounded-full">
             <Award className="w-5 h-5" />
           </div>
           <span className="text-[10px] font-bold uppercase tracking-wider">Impact</span>
         </button>
+
+        <Link 
+          href="/claims"
+          className={`flex-1 flex flex-col items-center gap-1 py-3 px-2 rounded-full transition-all text-slate-400 hover:text-slate-200`}
+        >
+          <div className="p-1 rounded-full text-white/60">
+            <Award className="w-5 h-5" />
+          </div>
+          <span className="text-[10px] font-bold uppercase tracking-wider">Review</span>
+        </Link>
       </nav>
 
       <RaiseStakesModal

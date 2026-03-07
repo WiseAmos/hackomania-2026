@@ -23,6 +23,7 @@ export interface ClaimManifest {
       income_loss_proof: string;
     };
   };
+  votes: { count: number; voterIds: string[] };
 }
 
 export interface VerificationResults {
@@ -54,6 +55,11 @@ export class PDLEngine {
    * Processes a claim manifest and returns the unified response.
    */
   public async processClaim(manifest: ClaimManifest): Promise<UnifiedResponse> {
+    // Ensure votes initialized securely
+    if (!manifest.votes) {
+      manifest.votes = { count: 0, voterIds: [] };
+    }
+
     let result;
     try {
       result = await this.getAIAssessment(manifest);

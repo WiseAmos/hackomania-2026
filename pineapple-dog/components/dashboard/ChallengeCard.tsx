@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Users, HandCoins, Clock } from "lucide-react";
+import { Users, HandCoins, Clock, Plus, Zap } from "lucide-react";
 import { Wager } from "../../types/dashboard";
 
 interface ChallengeCardProps {
@@ -69,8 +69,16 @@ export function ChallengeCard({ data, onAction }: ChallengeCardProps) {
                 <div className="font-bold text-white text-[12px] md:text-sm truncate">{user.name}</div>
               </div>
             </div>
-            <div className="text-[8px] md:text-[10px] font-bold text-[#6366F1] uppercase tracking-wider bg-[#6366F1]/10 px-1.5 py-0.5 md:px-2 md:py-0.5 rounded-md shrink-0">
-              {title}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <div className="text-[8px] md:text-[10px] font-bold text-[#6366F1] uppercase tracking-wider bg-[#6366F1]/10 px-1.5 py-0.5 md:px-2 md:py-0.5 rounded-md">
+                {title}
+              </div>
+              {wager.isStreak && (
+                <div className="text-[8px] md:text-[10px] font-bold text-amber-500 uppercase tracking-wider bg-amber-500/10 px-1.5 py-0.5 md:px-2 md:py-0.5 rounded-md flex items-center gap-1">
+                  <Zap className="w-2.5 h-2.5" />
+                  STREAK
+                </div>
+              )}
             </div>
           </div>
 
@@ -97,10 +105,10 @@ export function ChallengeCard({ data, onAction }: ChallengeCardProps) {
         <div className="mt-auto">
           <button
             onClick={() => onAction(data)}
-            className="w-full flex items-center justify-center gap-1.5 md:gap-2 text-white py-1.5 md:py-3 rounded-xl md:rounded-2xl font-bold transition-all text-[11px] md:text-sm hover:-translate-y-0.5 shadow-2xl active:scale-95 bg-gradient-to-r from-[#FF4D4D] to-[#6366F1] shadow-[#FF4D4D]/20"
+            className="w-full flex items-center justify-center gap-1.5 md:gap-2 text-white py-1.5 md:py-3 rounded-xl md:rounded-2xl font-bold transition-all text-[11px] md:text-sm hover:-translate-y-0.5 shadow-2xl active:scale-95 bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] shadow-[#6366F1]/20"
           >
-            <HandCoins className="w-3.5 h-3.5 md:w-4 md:h-4" />
-            Raise Stakes
+            <Plus className="w-3.5 h-3.5 md:w-4 md:h-4" />
+            Join Challenge
           </button>
         </div>
       </div>

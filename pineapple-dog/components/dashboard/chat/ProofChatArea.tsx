@@ -1,4 +1,4 @@
-import { Camera, Upload } from "lucide-react";
+import { Camera, Upload, Trophy } from "lucide-react";
 import { ChatWager } from "../../../types/chat";
 import { ImageMessageBubble } from "./ImageMessageBubble";
 import { SystemAlertBubble } from "./SystemAlertBubble";
@@ -68,7 +68,31 @@ export function ProofChatArea({ activeWager, onVote, onUpload, onOpenCamera, cur
 
       {/* Upload Actions Footer */}
       <div className="p-4 md:p-6 bg-slate-900 border-t border-white/5 shrink-0 z-20 sticky bottom-0">
-        {hasUploadedToday ? (
+        {activeWager.dbStatus === 'resolved' ? (
+          (() => {
+            const me = activeWager.participants.find(p => p.id === currentUserId);
+            if (me?.status === 'winner') {
+              return (
+                <div className="w-full py-4 px-6 bg-emerald-500/10 border border-emerald-500/20 rounded-[1.5rem] flex items-center justify-center gap-3">
+                  <Trophy className="w-5 h-5 text-emerald-500" />
+                  <span className="text-emerald-500 font-black text-sm uppercase tracking-widest italic">YOU WON! • Payout Dispatched</span>
+                </div>
+              );
+            } else if (me?.status === 'eliminated') {
+              return (
+                <div className="w-full py-4 px-6 bg-[#FF4D4D]/10 border border-[#FF4D4D]/20 rounded-[1.5rem] flex items-center justify-center gap-3">
+                  <span className="text-[#FF4D4D] font-black text-sm uppercase tracking-widest italic leading-tight text-center">Challenge Ended • Stake Eliminated</span>
+                </div>
+              );
+            }
+            return (
+              <div className="w-full py-4 px-6 bg-[#6366F1]/10 border border-[#6366F1]/20 rounded-[1.5rem] flex items-center justify-center gap-3">
+                 <Trophy className="w-5 h-5 text-[#6366F1]" />
+                 <span className="text-[#6366F1] font-black text-sm uppercase tracking-widest italic">Challenge Resolved • Winner Awarded</span>
+              </div>
+            );
+          })()
+        ) : (activeWager.isStreak && hasUploadedToday) ? (
           <div className="w-full py-4 px-6 bg-emerald-500/10 border border-emerald-500/20 rounded-[1.5rem] flex items-center justify-center gap-3">
              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
              <span className="text-emerald-500 font-black text-sm uppercase tracking-widest italic">Today's Proof Secured</span>
@@ -78,13 +102,13 @@ export function ProofChatArea({ activeWager, onVote, onUpload, onOpenCamera, cur
             {/* Camera Button */}
             <button 
               onClick={onOpenCamera}
-              className={`flex-1 group relative overflow-hidden py-4 rounded-[1.5rem] font-[family-name:var(--font-heading)] font-bold md:text-lg flex items-center justify-center gap-2 md:gap-3 transition-all duration-300 shadow-[0_0_24px_rgba(99,102,241,0.2)] hover:shadow-[0_0_32px_rgba(99,102,241,0.4)] hover:-translate-y-0.5 active:scale-[0.98] border border-white/10 ${isRedStatus ? 'bg-gradient-to-r from-[#FF4D4D] to-[#6366F1] animate-pulse hover:animate-none' : 'bg-slate-800 hover:bg-[#6366F1]'} h-full`}
+              className={`flex-1 group relative overflow-hidden py-4 rounded-[1.5rem] font-[family-name:var(--font-heading)] font-bold md:text-lg flex items-center justify-center gap-2 md:gap-3 transition-all duration-300 shadow-[0_0_24px_rgba(99,102,241,0.2)] hover:shadow-[0_0_32px_rgba(99,102,241,0.4)] hover:-translate-y-0.5 active:scale-[0.98] border border-white/10 ${(activeWager.isStreak && activeWager.status === 'red') ? 'bg-gradient-to-r from-[#FF4D4D] to-[#6366F1] animate-pulse hover:animate-none' : 'bg-slate-800 hover:bg-[#6366F1]'} h-full`}
             >
-              <Camera className={`w-5 h-5 md:w-6 md:h-6 ${isRedStatus ? 'text-white' : 'text-[#6366F1] group-hover:text-white transition-colors'}`} />
-              <span className={isRedStatus ? 'text-white text-xs md:text-lg' : 'text-slate-300 group-hover:text-white transition-colors text-xs md:text-lg'}>📸 Take Photo</span>
+              <Camera className={`w-5 h-5 md:w-6 md:h-6 ${(activeWager.isStreak && activeWager.status === 'red') ? 'text-white' : 'text-[#6366F1] group-hover:text-white transition-colors'}`} />
+              <span className={(activeWager.isStreak && activeWager.status === 'red') ? 'text-white text-xs md:text-lg' : 'text-slate-300 group-hover:text-white transition-colors text-xs md:text-lg'}>📸 Take Photo</span>
               
               {/* Shine effect */}
-              {isRedStatus && (
+              {activeWager.isStreak && activeWager.status === 'red' && (
                 <div className="absolute top-0 -inset-full h-full w-1/2 z-5 block transform -skew-x-12 bg-gradient-to-r from-transparent to-white opacity-20 group-hover:animate-shine" />
               )}
             </button>

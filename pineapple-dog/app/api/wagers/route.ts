@@ -18,16 +18,15 @@ export async function GET(req: NextRequest) {
         data.push({ id: child.key, ...child.val() });
       });
     } else {
-      // My Wagers: return where user is player1 or player2
-      const snap1 = await wagersRef.orderByChild("player1/uid").equalTo(userId).once("value");
-      snap1.forEach((child) => {
-        data.push({ id: child.key, ...child.val() });
-      });
-
-      const snap2 = await wagersRef.orderByChild("player2/uid").equalTo(userId).once("value");
-      snap2.forEach((child) => {
-        if (!data.find((w: any) => w.id === child.key)) {
-          data.push({ id: child.key, ...child.val() });
+      // My Wagers: search across all as Firebase doesn't support deep array query easily
+      const snap = await wagersRef.once("value");
+      snap.forEach((child) => {
+        const wager = child.val();
+        const isParticipant = (wager.participants || []).some((p: any) => p.uid === userId) ||
+          wager.player1?.uid === userId ||
+          wager.player2?.uid === userId;
+        if (isParticipant) {
+          data.push({ id: child.key, ...wager });
         }
       });
     }
@@ -49,39 +48,62 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { title, description, deadline, stakeAmount, player1, player2, grantId, wagerId, imageUrl } = body;
+    const {
+      title, description, deadline, poolExpiry,
+      stakeAmount, player1, player2, grantId,
+      wagerId, imageUrl, type, isStreak, participants
+    } = body;
 
     if (!title || !stakeAmount || !player1) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    }
+
+    // Normalize participants — always ensure grantId is present per player
+    let normalizedParticipants: any[];
+    if (Array.isArray(participants) && participants.length > 0) {
+      // Use provided array, but ensure the first participant (creator) gets the grantId if missing
+      normalizedParticipants = participants.map((p: any, i: number) => ({
+        uid: p.uid || "",
+        name: p.name || "",
+        avatar: p.avatar || "",
+        handle: p.handle || "",
+        walletAddress: p.walletAddress || "",
+        // Creator gets the grantId from the top-level param if their entry is missing it
+        grantId: p.grantId || (i === 0 ? (grantId || "") : ""),
+        status: p.status || "alive",
+        stakedAmount: Number(p.stakedAmount || stakeAmount || 0),
+        joinedAt: p.joinedAt || new Date().toISOString(),
+      }));
+    } else {
+      // Fallback: build participant from player1 + grantId
+      normalizedParticipants = [{
+        uid: player1.uid || "",
+        name: player1.name || "Creator",
+        avatar: player1.avatar || "",
+        handle: player1.handle || "",
+        walletAddress: player1.walletAddress || "",
+        grantId: grantId || "",          // ← stored PER PLAYER, not top-level
+        status: "alive",
+        stakedAmount: Number(stakeAmount),
+        joinedAt: new Date().toISOString(),
+      }];
     }
 
     const wagerData = {
       title,
       description: description || "",
       deadline: deadline || "",
+      poolExpiry: poolExpiry || "",
       stakeAmount: Number(stakeAmount),
       imageUrl: imageUrl || "",
       timeRemaining: "",
-      totalStake: Number(stakeAmount) * 2,
-      player1: {
-        uid: player1.uid || "",
-        name: player1.name || "Player 1",
-        avatar: player1.avatar || "?",
-        handle: player1.handle || "",
-        walletAddress: player1.walletAddress || "",
-        status: "alive",
-        stakedAmount: Number(stakeAmount),
-      },
-      player2: {
-        uid: player2?.uid || "",
-        name: player2?.name || "Opponent",
-        avatar: player2?.avatar || "?",
-        handle: player2?.handle || "",
-        walletAddress: player2?.walletAddress || "",
-        status: "alive",
-        stakedAmount: Number(stakeAmount),
-      },
-      grantId: grantId || "",
+      type: type || "competitive",
+      isStreak: !!isStreak,
+      totalStake: Number(stakeAmount) * normalizedParticipants.length,
+      player1: player1 || null,
+      player2: player2 || null,
+      participants: normalizedParticipants,
+      // NOTE: NO top-level grantId — each participant owns their own grant
       status: "active",
       winner: null,
       createdAt: new Date().toISOString(),
@@ -98,7 +120,7 @@ export async function POST(req: NextRequest) {
     const statsRef = adminDb.ref("pool/stats/totalValueLocked");
     const statsSnap = await statsRef.once("value");
     const currentTVL = statsSnap.val() || 0;
-    await statsRef.set(currentTVL + Number(stakeAmount) * 2);
+    await statsRef.set(currentTVL + wagerData.totalStake);
 
     return NextResponse.json({ id: ref.key, ...wagerData });
   } catch (err) {

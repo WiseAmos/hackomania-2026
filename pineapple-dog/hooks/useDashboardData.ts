@@ -17,18 +17,21 @@ export function useActiveShowdowns(userId?: string) {
   const [myWagers, setMyWagers] = useState<Wager[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
+  const fetchWagers = () => {
     setIsLoading(true);
 
     const enrichWagers = (data: any[]): Wager[] => {
-      return (Array.isArray(data) ? data : []).map((w) => ({
-        ...w,
-        timeRemaining: formatTimeRemaining(w.deadline),
-        participants: [
-          { ...w.player1, user: { id: w.player1?.uid || "", name: w.player1?.name || "", avatar: w.player1?.avatar || "?", handle: w.player1?.handle || "" } },
-          { ...w.player2, user: { id: w.player2?.uid || "", name: w.player2?.name || "", avatar: w.player2?.avatar || "?", handle: w.player2?.handle || "" } },
-        ],
-      }));
+      return (Array.isArray(data) ? data : []).map((w) => {
+        const rawParticipants = w.participants || [w.player1, w.player2].filter(Boolean);
+        return {
+          ...w,
+          timeRemaining: formatTimeRemaining(w.deadline),
+          participants: rawParticipants.map((p: any) => ({
+            ...p,
+            user: { id: p.uid || "", name: p.name || "", avatar: p.avatar || "?", handle: p.handle || "" }
+          })),
+        };
+      });
     };
 
     const fetches = [fetch("/api/wagers").then(r => r.json())];
@@ -49,9 +52,13 @@ export function useActiveShowdowns(userId?: string) {
         setMyWagers([]);
       })
       .finally(() => setIsLoading(false));
+  };
+
+  useEffect(() => {
+    fetchWagers();
   }, [userId]);
 
-  return { globalWagers, myWagers, isLoading };
+  return { globalWagers, myWagers, isLoading, refresh: fetchWagers };
 }
 
 export function useArenaFeed() {

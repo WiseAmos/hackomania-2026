@@ -35,6 +35,15 @@ export default function WagerPage() {
     const [searchQuery, setSearchQuery] = useState("");
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [imageUrl, setImageUrl] = useState("");
+    const [challengeType, setChallengeType] = useState<"global" | "competitive">("global");
+    const [isStreak, setIsStreak] = useState(false);
+
+    // Pre-fill wallet from profile
+    useEffect(() => {
+        if (user && !myWallet) {
+            setMyWallet(user.interledgerLink || user.walletAddress || "");
+        }
+    }, [user, myWallet]);
 
     // Fetch users on mount for the autocomplete dropdown
     useEffect(() => {
@@ -62,6 +71,8 @@ export default function WagerPage() {
             setMyWallet(parsed.myWallet || "");
             setOpponentUser(parsed.opponentUser || null);
             setImageUrl(parsed.imageUrl || "");
+            setChallengeType(parsed.challengeType || "global");
+            setIsStreak(parsed.isStreak || false);
         }
 
         if (interactRef && hash && returnedWagerId) {
@@ -97,27 +108,61 @@ export default function WagerPage() {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    title: restored.title || "Untitled Showdown",
+                    title: restored.title || "Untitled Challenge",
                     description: restored.description || "",
                     deadline: restored.deadline || "",
+                    poolExpiry: (() => {
+                        if (!restored.deadline) return "";
+                        const d = new Date(restored.deadline);
+                        d.setFullYear(d.getFullYear() + 1);
+                        return d.toISOString();
+                    })(),
                     stakeAmount: parseFloat(restored.stakeAmount || "0"),
                     wagerId: wagerId,
                     grantId,
                     imageUrl: restored.imageUrl || "",
+                    type: restored.challengeType || "global",
+                    isStreak: restored.isStreak || false,
                     player1: {
                         uid: user.uid,
                         name: user.name,
                         avatar: user.avatar,
                         handle: user.handle,
                         walletAddress: restored.myWallet || "",
+                        stakedAmount: parseFloat(restored.stakeAmount || "0"),
+                        status: "alive"
                     },
-                    player2: {
-                        uid: opponentUser?.uid || "",
-                        name: opponentUser?.name || "Opponent",
-                        avatar: opponentUser?.avatar || "?",
-                        handle: opponentUser?.handle || "",
-                        walletAddress: opponentUser?.walletAddress || restored.opponentWallet || "",
-                    },
+                    player2: restored.challengeType === "competitive" ? restored.opponentUser : null,
+                    participants: restored.challengeType === "competitive" ? [
+                        {
+                            uid: user.uid,
+                            name: user.name,
+                            avatar: user.avatar,
+                            handle: user.handle,
+                            walletAddress: restored.myWallet || "",
+                            stakedAmount: parseFloat(restored.stakeAmount || "0"),
+                            grantId,
+                            status: "alive",
+                            joinedAt: new Date().toISOString()
+                        },
+                        {
+                            ...restored.opponentUser,
+                            status: "awaiting_auth",
+                            joinedAt: new Date().toISOString()
+                        }
+                    ] : [
+                        {
+                            uid: user.uid,
+                            name: user.name,
+                            avatar: user.avatar,
+                            handle: user.handle,
+                            walletAddress: restored.myWallet || "",
+                            stakedAmount: parseFloat(restored.stakeAmount || "0"),
+                            grantId,
+                            status: "alive",
+                            joinedAt: new Date().toISOString()
+                        }
+                    ]
                 }),
             })
                 .then(() => {
@@ -131,8 +176,13 @@ export default function WagerPage() {
     }, [wagerId, user]);
 
     const handleCreateShowdown = async () => {
-        if (!title || !stakeAmount || !myWallet || !opponentUser || !deadline) {
-            setError("Please fill in all fields and select an opponent");
+        if (!title || !stakeAmount || !myWallet || !deadline) {
+            setError("Please fill in all fields");
+            return;
+        }
+
+        if (challengeType === "competitive" && !opponentUser) {
+            setError("Please select an opponent for a Direct Showdown");
             return;
         }
 
@@ -151,9 +201,10 @@ export default function WagerPage() {
                     stakeAmount,
                     deadline,
                     myWallet,
-                    opponentWallet: opponentUser.walletAddress,
-                    opponentUser,
                     imageUrl,
+                    challengeType,
+                    isStreak,
+                    opponentUser: challengeType === "competitive" ? opponentUser : null,
                 })
             );
 
@@ -164,7 +215,6 @@ export default function WagerPage() {
                 title,
                 description,
                 deadline,
-                opponentWallet: opponentUser.walletAddress,
             });
 
             const res = await fetch(`/api/ilp/grant?${params}`);
@@ -204,7 +254,7 @@ export default function WagerPage() {
                 <div className="flex items-center gap-2">
                     <Swords className="w-5 h-5 text-[#6366F1]" />
                     <span className="font-[family-name:var(--font-heading)] font-bold text-lg">
-                        New Showdown
+                        {challengeType === "global" ? "Global Arena" : "Direct Showdown"}
                     </span>
                 </div>
             </nav>
@@ -230,12 +280,29 @@ export default function WagerPage() {
                                     <Swords className="w-8 h-8 text-white" />
                                 </motion.div>
                                 <h1 className="font-[family-name:var(--font-heading)] text-3xl font-bold mb-2">
-                                    Create a Showdown
+                                    {challengeType === "global" ? "Declare Global Challenge" : "Challenge a Friend"}
                                 </h1>
                                 <p className="text-slate-400 text-sm max-w-md mx-auto">
-                                    Challenge a friend. Both of you stake real money. The loser&apos;s
-                                    stake fuels disaster relief. The winner gets half back.
+                                    {challengeType === "global" 
+                                        ? "Whoever on the platform can take up your challenge. The first to submit valid proof wins."
+                                        : "Directly challenge an opponent to a high-stakes duel. Only the bravest win."}
                                 </p>
+                            </div>
+
+                            {/* Challenge Type Selector */}
+                            <div className="flex p-1 bg-slate-800/80 rounded-2xl border border-white/5 max-w-md mx-auto">
+                                <button
+                                    onClick={() => setChallengeType("global")}
+                                    className={`flex-1 py-3 px-4 rounded-xl text-sm font-bold transition-all ${challengeType === "global" ? "bg-[#6366F1] text-white shadow-lg" : "text-slate-400 hover:text-white"}`}
+                                >
+                                    Global Arena
+                                </button>
+                                <button
+                                    onClick={() => setChallengeType("competitive")}
+                                    className={`flex-1 py-3 px-4 rounded-xl text-sm font-bold transition-all ${challengeType === "competitive" ? "bg-[#6366F1] text-white shadow-lg" : "text-slate-400 hover:text-white"}`}
+                                >
+                                    Direct Showdown
+                                </button>
                             </div>
 
                             {/* Form Card */}
@@ -363,6 +430,71 @@ export default function WagerPage() {
 
                                 {/* Wallet Addresses */}
                                 <div className="space-y-4">
+                                    {challengeType === "competitive" && (
+                                        <div className="relative">
+                                            <label className="block text-slate-400 text-xs uppercase tracking-wider mb-2 font-semibold">
+                                                Select Opponent
+                                            </label>
+                                            <div className="relative">
+                                                <input
+                                                    type="text"
+                                                    value={searchQuery}
+                                                    onChange={(e) => {
+                                                        setSearchQuery(e.target.value);
+                                                        setIsDropdownOpen(true);
+                                                    }}
+                                                    onFocus={() => setIsDropdownOpen(true)}
+                                                    placeholder="Search citizens by name or handle..."
+                                                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder:text-slate-500 focus:outline-none focus:border-[#6366F1]/60 focus:ring-1 focus:ring-[#6366F1]/30 transition-all"
+                                                />
+                                                {opponentUser && (
+                                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2 bg-[#6366F1]/20 px-3 py-1 rounded-lg border border-[#6366F1]/30">
+                                                        <div className="w-5 h-5 rounded-full bg-slate-700 overflow-hidden">
+                                                            <img src={opponentUser.avatar} alt="" className="w-full h-full object-cover" />
+                                                        </div>
+                                                        <span className="text-xs font-bold text-[#6366F1]">{opponentUser.name}</span>
+                                                        <button 
+                                                            onClick={() => setOpponentUser(null)}
+                                                            className="text-[#6366F1] hover:text-white transition-colors"
+                                                        >
+                                                            &times;
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Dropdown */}
+                                            {isDropdownOpen && searchQuery && (
+                                                <div className="absolute z-[100] left-0 right-0 mt-2 bg-slate-800 border border-white/10 rounded-xl shadow-2xl overflow-hidden max-h-60 overflow-y-auto custom-scrollbar">
+                                                    {users
+                                                        .filter(u => u.uid !== user?.uid && (u.name.toLowerCase().includes(searchQuery.toLowerCase()) || u.handle.toLowerCase().includes(searchQuery.toLowerCase())))
+                                                        .map((u) => (
+                                                            <button
+                                                                key={u.uid}
+                                                                onClick={() => {
+                                                                    setOpponentUser(u);
+                                                                    setSearchQuery("");
+                                                                    setIsDropdownOpen(false);
+                                                                }}
+                                                                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0 text-left"
+                                                            >
+                                                                <div className="w-8 h-8 rounded-full bg-slate-700 overflow-hidden">
+                                                                    <img src={u.avatar} alt="" className="w-full h-full object-cover" />
+                                                                </div>
+                                                                <div>
+                                                                    <div className="text-sm font-bold text-white">{u.name}</div>
+                                                                    <div className="text-[10px] text-slate-500 font-medium">{u.handle}</div>
+                                                                </div>
+                                                            </button>
+                                                        ))}
+                                                    {users.filter(u => u.uid !== user?.uid && (u.name.toLowerCase().includes(searchQuery.toLowerCase()) || u.handle.toLowerCase().includes(searchQuery.toLowerCase()))).length === 0 && (
+                                                        <div className="px-4 py-4 text-center text-slate-500 text-xs italic">No matching citizens found</div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
                                     <div>
                                         <label className="block text-slate-400 text-xs uppercase tracking-wider mb-2 font-semibold">
                                             <Wallet className="w-3 h-3 inline mr-1" />
@@ -376,104 +508,30 @@ export default function WagerPage() {
                                             className="w-full bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder:text-slate-500 focus:outline-none focus:border-[#6366F1]/60 focus:ring-1 focus:ring-[#6366F1]/30 transition-all"
                                         />
                                     </div>
-                                    <div className="relative">
-                                        <label className="block text-slate-400 text-xs uppercase tracking-wider mb-2 font-semibold">
-                                            <Swords className="w-3 h-3 inline mr-1" />
-                                            Opponent Search
-                                        </label>
 
-                                        {opponentUser ? (
-                                            <div className="w-full bg-slate-900 border border-[#6366F1]/50 rounded-xl px-4 py-3 flex items-center justify-between">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-xs font-bold overflow-hidden">
-                                                        {opponentUser.avatar?.startsWith('http') ? (
-                                                            <img src={opponentUser.avatar} alt="avatar" className="w-full h-full object-cover" />
-                                                        ) : (
-                                                            opponentUser.avatar
-                                                        )}
-                                                    </div>
-                                                    <div>
-                                                        <div className="text-white text-sm font-semibold leading-tight">{opponentUser.name}</div>
-                                                        <div className="text-slate-500 text-xs">@{opponentUser.handle}</div>
-                                                    </div>
-                                                </div>
-                                                <button
-                                                    onClick={() => setOpponentUser(null)}
-                                                    className="text-slate-400 hover:text-white p-1"
-                                                >
-                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                                                </button>
+                                    {/* Streak Toggle */}
+                                    <div className="flex items-center justify-between p-4 bg-slate-900 border border-white/5 rounded-xl">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center">
+                                                <Zap className={`w-5 h-5 ${isStreak ? 'text-amber-500' : 'text-slate-500'}`} />
                                             </div>
-                                        ) : (
-                                            <>
-                                                <div className="relative">
-                                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                                        <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                                                    </div>
-                                                    <input
-                                                        type="text"
-                                                        value={searchQuery}
-                                                        onChange={(e) => {
-                                                            setSearchQuery(e.target.value);
-                                                            setIsDropdownOpen(true);
-                                                        }}
-                                                        onFocus={() => setIsDropdownOpen(true)}
-                                                        placeholder="Search user by name or handle..."
-                                                        className="w-full bg-slate-900 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-white text-sm placeholder:text-slate-500 focus:outline-none focus:border-[#6366F1]/60 focus:ring-1 focus:ring-[#6366F1]/30 transition-all"
-                                                    />
-                                                </div>
-
-                                                {/* Autocomplete Dropdown */}
-                                                <AnimatePresence>
-                                                    {isDropdownOpen && searchQuery && (
-                                                        <motion.div
-                                                            initial={{ opacity: 0, y: -5 }}
-                                                            animate={{ opacity: 1, y: 0 }}
-                                                            exit={{ opacity: 0, y: -5 }}
-                                                            className="absolute z-50 w-full mt-2 bg-slate-800 border border-white/10 rounded-xl shadow-2xl max-h-60 overflow-y-auto custom-scrollbar"
-                                                        >
-                                                            {users.filter(u =>
-                                                                (u.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                                                                    u.handle?.toLowerCase().includes(searchQuery.toLowerCase())) &&
-                                                                u.uid !== user?.uid // don't show self
-                                                            ).map(u => (
-                                                                <button
-                                                                    key={u.uid}
-                                                                    onClick={() => {
-                                                                        setOpponentUser(u);
-                                                                        setSearchQuery("");
-                                                                        setIsDropdownOpen(false);
-                                                                    }}
-                                                                    className="w-full text-left flex items-center gap-3 px-4 py-3 hover:bg-slate-700/50 transition-colors border-b border-white/5 last:border-0"
-                                                                >
-                                                                    <div className="w-8 h-8 rounded-full bg-slate-900 flex items-center justify-center text-xs font-bold shrink-0 overflow-hidden">
-                                                                        {u.avatar?.startsWith('http') ? (
-                                                                            <img src={u.avatar} alt="avatar" className="w-full h-full object-cover" />
-                                                                        ) : (
-                                                                            u.avatar
-                                                                        )}
-                                                                    </div>
-                                                                    <div>
-                                                                        <div className="text-white text-sm font-semibold">{u.name}</div>
-                                                                        <div className="text-slate-400 text-xs">@{u.handle}</div>
-                                                                    </div>
-                                                                </button>
-                                                            ))}
-                                                            {users.filter(u =>
-                                                                (u.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                                                                    u.handle?.toLowerCase().includes(searchQuery.toLowerCase())) &&
-                                                                u.uid !== user?.uid
-                                                            ).length === 0 && (
-                                                                    <div className="px-4 py-3 text-sm text-slate-500 text-center">
-                                                                        No users found
-                                                                    </div>
-                                                                )}
-                                                        </motion.div>
-                                                    )}
-                                                </AnimatePresence>
-                                            </>
-                                        )}
+                                            <div>
+                                                <div className="text-sm font-bold text-white">Daily Streak Requirement</div>
+                                                <div className="text-[10px] text-slate-500 font-medium">Participants must upload proof every 24h</div>
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsStreak(!isStreak)}
+                                            className={`relative w-12 h-6 rounded-full transition-colors ${isStreak ? 'bg-[#6366F1]' : 'bg-slate-700'}`}
+                                        >
+                                            <motion.div
+                                                animate={{ x: isStreak ? 26 : 2 }}
+                                                className="absolute top-1 left-0 w-4 h-4 rounded-full bg-white shadow-md"
+                                            />
+                                        </button>
                                     </div>
+
                                 </div>
 
                                 {/* Fee Disclosure */}
@@ -481,14 +539,11 @@ export default function WagerPage() {
                                     <div className="flex items-start gap-3">
                                         <Zap className="w-4 h-4 text-[#6366F1] mt-0.5 shrink-0" />
                                         <div className="text-xs text-slate-300 leading-relaxed">
-                                            <strong className="text-white">How it works:</strong> Both
-                                            players authorize a ${stakeAmount || "0"} hold. The winner
-                                            gets their money back + 50% of the loser&apos;s stake. The
-                                            remaining 50% goes to the{" "}
-                                            <span className="text-[#06B6D4] font-semibold">
-                                                Community Relief Pool
-                                            </span>
-                                            .
+                                            <strong className="text-white">{challengeType === "global" ? "Global Rules:" : "Showdown Rules:"}</strong> {challengeType === "global" 
+                                                ? "Anyone can join. The first to submit valid proof wins the challenge."
+                                                : "The winner takes half the loser's stake. If neither wins, funds go to the Relief Pool after 1 year."}
+                                            <br />
+                                            Funds are held for up to <span className="text-[#06B6D4] font-bold">1 year after expiry</span> for the Community Relief Pool if no winner is declared.
                                         </div>
                                     </div>
                                 </div>
@@ -512,7 +567,6 @@ export default function WagerPage() {
                                         !title ||
                                         !stakeAmount ||
                                         !myWallet ||
-                                        !opponentUser ||
                                         !deadline
                                     }
                                     className="w-full bg-[#6366F1] hover:bg-[#4F46E5] disabled:opacity-40 disabled:cursor-not-allowed text-white py-3.5 rounded-xl font-[family-name:var(--font-heading)] font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-[0_0_24px_rgba(99,102,241,0.4)] hover:-translate-y-0.5 active:scale-[0.98]"
@@ -522,7 +576,7 @@ export default function WagerPage() {
                                     ) : (
                                         <Swords className="w-4 h-4" />
                                     )}
-                                    {isSubmitting ? "Connecting to Wallet..." : "Create Showdown"}
+                                    {isSubmitting ? "Connecting to Wallet..." : challengeType === "global" ? "Declare Global Challenge" : "Issue Direct Challenge"}
                                 </button>
                             </div>
                         </motion.div>

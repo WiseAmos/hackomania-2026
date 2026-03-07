@@ -2,18 +2,17 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { LogOut, Plus, Wallet, Award, Loader2, User, Users } from "lucide-react";
+import { Award, Loader2, User, Plus, LogOut, Users } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useAuth } from "../../lib/AuthContext";
-import { useActiveShowdowns, useArenaFeed, useImpactPortfolio } from "../../hooks/useDashboardData";
-import { ProofSubmissionModal } from "../../components/dashboard/ProofSubmissionModal";
-import { ProofFeed } from "../../components/dashboard/ProofFeed";
-import { FriendsModal } from "../../components/dashboard/FriendsModal";
-import { ImpactSection } from "../../components/dashboard/ImpactSection";
-import { ChallengeCard } from "../../components/dashboard/ChallengeCard";
-import { WagerChatLayout } from "../../components/dashboard/chat/WagerChatLayout";
-import { RaiseStakesModal } from "../../components/dashboard/RaiseStakesModal";
+import { useAuth } from "@/lib/AuthContext";
+import { useActiveShowdowns, useArenaFeed, useImpactPortfolio } from "@/hooks/useDashboardData";
+import { ProofSubmissionModal } from "@/components/dashboard/ProofSubmissionModal";
+import { ProofFeed } from "@/components/dashboard/ProofFeed";
+import { FriendsModal } from "@/components/dashboard/FriendsModal";
+import { ImpactSection } from "@/components/dashboard/ImpactSection";
+import { ChallengeCard } from "@/components/dashboard/ChallengeCard";
+import { WagerChatLayout } from "@/components/dashboard/chat/WagerChatLayout";
 import { ProofPost, Wager } from "../../types/dashboard";
 
 // ----------------------------------------------------------------------
@@ -36,18 +35,73 @@ export default function ArenaDashboardLayout() {
     }
   }, [user, loading, router]);
 
-  const { globalWagers, myWagers, isLoading: isLoadingWagers } = useActiveShowdowns(user?.uid);
+  const { globalWagers, myWagers, isLoading: isLoadingWagers, refresh: refreshWagers } = useActiveShowdowns(user?.uid);
   const { feed, isLoading: isLoadingFeed } = useArenaFeed();
   const { claims, isLoading: isLoadingImpact } = useImpactPortfolio(user?.uid);
 
   // Modal states - moved before early returns to follow Rules of Hooks
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedRaisingWager, setSelectedRaisingWager] = useState<Wager | null>(null);
   const [isProveModalOpen, setIsProveModalOpen] = useState(false);
   const [selectedWagerPrompt, setSelectedWagerPrompt] = useState<Wager | null>(null);
   const [selectedHasUploadedToday, setSelectedHasUploadedToday] = useState(false);
   const [selectedInitialFile, setSelectedInitialFile] = useState<File | null>(null);
   const [isFriendsModalOpen, setIsFriendsModalOpen] = useState(false);
+
+  // Handle ILP Callback for Joining - moved before early returns to follow Rules of Hooks
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const interactRef = params.get("interact_ref");
+    const hash = params.get("hash");
+    const pendingJoin = sessionStorage.getItem("pendingJoin");
+
+    if (interactRef && hash && pendingJoin && user) {
+      const { wagerId } = JSON.parse(pendingJoin);
+      const grantId = sessionStorage.getItem("pendingJoinGrantId");
+
+      if (grantId) {
+        // 1. Finalize the grant
+        fetch("/api/ilp/interact", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ grantId, interact_ref: interactRef, hash }),
+        })
+        .then(r => r.json())
+        .then(() => {
+          // 2. Finalize the join in database
+          return fetch("/api/wagers/join", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              wagerId,
+              grantId,
+              user: {
+                uid: user.uid,
+                name: user.name,
+                avatar: user.avatar,
+                handle: user.handle,
+                walletAddress: user.interledgerLink || user.walletAddress || ""
+              }
+            }),
+          });
+        })
+        .then(async (resp) => {
+          const respData = await resp.json();
+          if (resp.ok || respData.success || respData.updated) {
+            sessionStorage.removeItem("pendingJoin");
+            sessionStorage.removeItem("pendingJoinGrantId");
+            // Clean up URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+            refreshWagers();
+            setActiveTab("personal");
+          } else {
+            alert(respData.error || "Failed to finalize join");
+          }
+        })
+        .catch(err => {
+          console.error("Finalize join error:", err);
+        });
+      }
+    }
+  }, [user]);
 
   // Show loading spinner while checking auth
   if (loading) {
@@ -65,10 +119,50 @@ export default function ArenaDashboardLayout() {
     router.push("/");
   };
 
-  const handleOpenRaiseModal = (wager: Wager) => {
-    setSelectedRaisingWager(wager);
-    setIsModalOpen(true);
+  const handleJoinChallenge = async (wager: Wager) => {
+    if (!user) return;
+    
+    // Check for wallet address, support both field names
+    const walletAddress = user.interledgerLink || user.walletAddress;
+    if (!walletAddress) {
+      alert("Please set your Interledger link in your profile first!");
+      router.push("/profile");
+      return;
+    }
+
+    try {
+      const amountCents = Math.round(wager.stakeAmount * 100).toString();
+      
+      // Save join intent to session
+      sessionStorage.setItem("pendingJoin", JSON.stringify({
+        wagerId: wager.id,
+        stakeAmount: wager.stakeAmount
+      }));
+
+      const params = new URLSearchParams({
+        walletAddress,
+        amount: amountCents,
+        player: "participant",
+        title: `Join: ${wager.title}`,
+        description: `Staking ${wager.stakeAmount} SGD to join this challenge`,
+        deadline: wager.deadline || "",
+      });
+
+      const res = await fetch(`/api/ilp/grant?${params}`);
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.message || "Failed to request grant");
+
+      // Redirect to wallet for authorization
+      sessionStorage.setItem("pendingJoinGrantId", data.grantId);
+      window.location.href = data.grantUrl;
+    } catch (err) {
+      console.error("Join error:", err);
+      alert(err instanceof Error ? err.message : "Failed to initiate join");
+    }
   };
+
+
 
   const handleOpenProveModal = (wager: Wager, hasUploaded?: boolean, file?: File) => {
     setSelectedWagerPrompt(wager);
@@ -103,13 +197,13 @@ export default function ArenaDashboardLayout() {
               onClick={() => setActiveTab("personal")}
               className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${activeTab === "personal" ? "bg-[#6366F1] text-white shadow-lg" : "text-slate-400 hover:text-white"}`}
             >
-              My Wages
+              My Showdowns
             </button>
             <button
               onClick={() => setActiveTab("arena")}
               className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${activeTab === "arena" ? "bg-[#6366F1] text-white shadow-lg" : "text-slate-400 hover:text-white"}`}
             >
-              Arena
+              Global Arena
             </button>
             <button
               onClick={() => setActiveTab("impact")}
@@ -123,12 +217,10 @@ export default function ArenaDashboardLayout() {
         <div className="flex items-center gap-3 sm:gap-6">
           <button
             onClick={() => setIsFriendsModalOpen(true)}
-            className="bg-slate-800 hover:bg-slate-700 border border-white/10 rounded-full px-4 py-2.5 flex items-center gap-2 shadow-inner transition-colors"
+            className="hidden sm:flex items-center gap-2 bg-slate-800/50 hover:bg-slate-800 text-white/70 hover:text-white px-4 py-2.5 rounded-full font-bold text-xs sm:text-sm transition-all border border-white/5"
           >
-            <Users className="w-4 h-4 text-[#06B6D4]" />
-            <span className="font-bold text-xs sm:text-sm text-[#06B6D4]">
-              Friends
-            </span>
+            <Users className="w-4 h-4" />
+            Friends
           </button>
           <Link href="/profile" className="hidden md:flex items-center gap-2 bg-slate-800/50 hover:bg-slate-800 text-white/70 hover:text-white px-4 py-2.5 rounded-full font-bold text-xs sm:text-sm transition-all border border-white/5">
             <User className="w-4 h-4" />
@@ -140,7 +232,7 @@ export default function ArenaDashboardLayout() {
           </Link>
           <Link href="/wager" className="bg-[#6366F1] hover:bg-[#4F46E5] text-white px-4 sm:px-5 py-2.5 rounded-full font-[family-name:var(--font-heading)] font-bold text-xs sm:text-sm flex items-center gap-2 transition-all shadow-[0_0_24px_rgba(99,102,241,0.4)] hover:-translate-y-0.5 active:scale-95 whitespace-nowrap">
             <Plus className="w-4 h-4" />
-            New Showdown
+            Start Global Challenge
           </Link>
           <button
             onClick={handleSignOut}
@@ -183,7 +275,7 @@ export default function ArenaDashboardLayout() {
                   } else {
                     handleOpenProveModal({
                       id: wagerId,
-                      title: "Current Showdown",
+                      title: "Current Challenge",
                       totalStake: 50,
                       timeRemaining: "12:00:00",
                     } as Wager, hasUploaded);
@@ -196,7 +288,7 @@ export default function ArenaDashboardLayout() {
                   } else {
                     handleOpenProveModal({
                       id: wagerId,
-                      title: "Current Showdown",
+                      title: "Current Challenge",
                       totalStake: 50,
                       timeRemaining: "12:00:00",
                     } as Wager, false, file);
@@ -218,7 +310,7 @@ export default function ArenaDashboardLayout() {
                 isLoading={isLoadingFeed}
                 posts={feed}
                 allWagers={globalWagers}
-                onRaiseStakes={handleOpenRaiseModal}
+                onJoinChallenge={handleJoinChallenge}
               />
             </motion.div>
           )}
@@ -247,7 +339,7 @@ export default function ArenaDashboardLayout() {
           <div className="p-1 rounded-full">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
           </div>
-          <span className="text-[10px] font-bold uppercase tracking-wider">My Wages</span>
+          <span className="text-[10px] font-bold uppercase tracking-wider">Showdowns</span>
         </button>
 
         <button
@@ -257,7 +349,7 @@ export default function ArenaDashboardLayout() {
           <div className="p-1 rounded-full">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
           </div>
-          <span className="text-[10px] font-bold uppercase tracking-wider">Arena</span>
+          <span className="text-[10px] font-bold uppercase tracking-wider">Global</span>
         </button>
 
         <button
@@ -290,20 +382,6 @@ export default function ArenaDashboardLayout() {
           <span className="text-[10px] font-bold uppercase tracking-wider">Profile</span>
         </Link>
       </nav>
-
-      <RaiseStakesModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        wagerTitle={selectedRaisingWager?.title || ""}
-        participants={selectedRaisingWager ? (
-          selectedRaisingWager.participants || [selectedRaisingWager.player1, selectedRaisingWager.player2]
-        ).filter(Boolean).map(p => ({
-          id: p.uid,
-          name: p.name,
-          avatar: p.avatar,
-          handle: p.handle,
-        })) : []}
-      />
 
       <ProofSubmissionModal
         isOpen={isProveModalOpen}

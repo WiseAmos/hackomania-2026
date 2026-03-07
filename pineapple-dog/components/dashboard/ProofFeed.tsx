@@ -11,12 +11,12 @@ interface Props {
   isLoading: boolean;
   posts: ProofPost[];
   allWagers: Wager[];
-  onRaiseStakes: (wager: Wager) => void;
+  onJoinChallenge: (wager: Wager) => void;
 }
 
-export function ProofFeed({ isLoading, posts, allWagers, onRaiseStakes }: Props) {
+export function ProofFeed({ isLoading, posts, allWagers, onJoinChallenge }: Props) {
   const { user } = useAuth();
-  const [activeFeedTab, setActiveFeedTab] = useState<"friends" | "global">("friends");
+  const [activeFeedTab, setActiveFeedTab] = useState<"friends" | "global">("global");
   const [friends, setFriends] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
@@ -38,11 +38,16 @@ export function ProofFeed({ isLoading, posts, allWagers, onRaiseStakes }: Props)
   }
 
   const globalWagers = allWagers.filter(wager => {
-    return wager.player1?.uid !== user?.uid && wager.player2?.uid !== user?.uid;
+    const isParticipant = (wager.participants || []).some(p => p.uid === user?.uid) || 
+                          wager.player1?.uid === user?.uid || 
+                          wager.player2?.uid === user?.uid;
+    return !isParticipant;
   });
 
   const friendsWagers = globalWagers.filter(wager => {
-    return friends[wager.player1?.uid] || (wager.player2?.uid && friends[wager.player2?.uid]);
+    return (wager.participants || []).some(p => friends[p.uid]) || 
+           (wager.player1?.uid && friends[wager.player1.uid]) || 
+           (wager.player2?.uid && friends[wager.player2.uid]);
   });
 
   // Zero State for new users
@@ -60,7 +65,6 @@ export function ProofFeed({ isLoading, posts, allWagers, onRaiseStakes }: Props)
 
   return (
     <div className="w-full max-w-6xl mx-auto">
-
       {/* Toggles */}
       <div className="flex bg-slate-800/50 p-1.5 rounded-full border border-white/5 w-max mx-auto mb-6">
         <button
@@ -82,25 +86,21 @@ export function ProofFeed({ isLoading, posts, allWagers, onRaiseStakes }: Props)
 
       {/* Posts Grid Container */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6 px-3 md:px-0">
-        {activeFeedTab === "global" ? (
-          globalWagers.map((wager) => (
+        {(activeFeedTab === "global" ? globalWagers : friendsWagers).length > 0 ? (
+          (activeFeedTab === "global" ? globalWagers : friendsWagers).map((wager) => (
             <ChallengeCard
               key={wager.id}
               data={wager}
-              onAction={(data) => onRaiseStakes(data as Wager)}
-            />
-          ))
-        ) : friendsWagers.length > 0 ? (
-          friendsWagers.map((wager) => (
-            <ChallengeCard
-              key={wager.id}
-              data={wager}
-              onAction={(data) => onRaiseStakes(data as Wager)}
+              onAction={(data) => onJoinChallenge(data as Wager)}
             />
           ))
         ) : (
           <div className="col-span-full py-20 text-center">
-            <p className="text-slate-500 font-medium">None of your friends have wagers right now. Add some friends or check the Global feed!</p>
+            <p className="text-slate-500 font-medium">
+              {activeFeedTab === "friends" 
+                ? "No challenges from friends yet. Check the Global tab!" 
+                : "No global challenges available at the moment."}
+            </p>
           </div>
         )}
       </div>

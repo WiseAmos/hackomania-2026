@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { ChatWager, ChatUser, ChatMessage } from '../types/chat';
+import { Wager } from '../types/dashboard';
 
 export function useWagerChat(userId?: string, activeWagerId?: string) {
   const [wagers, setWagers] = useState<ChatWager[]>([]);
@@ -18,18 +19,48 @@ export function useWagerChat(userId?: string, activeWagerId?: string) {
 
       // Transform API wagers to ChatWagers
       const chatWagers: ChatWager[] = data.map((w: any) => {
-        const participants: ChatUser[] = [];
-        if (w.player1) participants.push({ id: w.player1.uid, name: w.player1.name, avatar: w.player1.avatar });
-        if (w.player2?.uid) participants.push({ id: w.player2.uid, name: w.player2.name, avatar: w.player2.avatar });
+        let participants: ChatUser[] = [];
+
+        if (Array.isArray(w.participants)) {
+          participants = w.participants.map((p: any) => ({
+            id: p.uid,
+            name: p.name,
+            avatar: p.avatar,
+            status: p.status,
+            grantId: p.grantId || null,
+          }));
+        } else {
+          // Fallback legacy
+          if (w.player1) participants.push({ id: w.player1.uid, name: w.player1.name, avatar: w.player1.avatar });
+          if (w.player2?.uid) participants.push({ id: w.player2.uid, name: w.player2.name, avatar: w.player2.avatar });
+        }
+
+        // Check if the current user's participant entry has a grantId
+        const myParticipant = (w.participants || []).find((p: any) => p.uid === userId);
+        // Also check top-level grantId for legacy wagers where creator's grantId was stored there
+        const isCreator = w.player1?.uid === userId || myParticipant === (w.participants || [])[0];
+        const legacyGrantId = isCreator ? (w.grantId || null) : null;
+        const myGrantId: string | null = (myParticipant?.grantId && myParticipant.grantId.length > 0)
+          ? myParticipant.grantId
+          : (legacyGrantId && legacyGrantId.length > 0 ? legacyGrantId : null);
+        // Only show the modal if we truly have no grant reference at all and the wager is still active
+        const needsGrant = !myGrantId && w.status === 'active';
 
         return {
           id: w.id,
           title: w.title,
           imageUrl: w.imageUrl || 'https://images.unsplash.com/photo-1552674605-db6ffd4facb5?auto=format&fit=crop&q=80&w=200',
-          status: 'green', // Default, we will update this based on proofs
-          latestAction: 'Wager active',
+          status: w.status === 'resolved' ? 'green' : 'green',
+          latestAction: w.status === 'resolved' ? 'Challenge Completed!' : 'Wager active',
           participants,
-          messages: [], // We'll fetch these separately or in parallel
+          isStreak: !!w.isStreak,
+          dbStatus: w.status,
+          messages: [],
+          // Grant tracking
+          myGrantId,
+          needsGrant,
+          stakeAmount: w.stakeAmount || 0,
+          wagerId: w.id,
         };
       });
 
@@ -47,7 +78,6 @@ export function useWagerChat(userId?: string, activeWagerId?: string) {
     if (!userId || wagers.length === 0) return;
     try {
       setIsSyncing(true);
-      // For simplicity, fetch all proofs and filter. In production, do this server-side or per wager.
       const resp = await fetch(`/api/proofs`);
       const allProofs = await resp.json();
 
@@ -69,42 +99,53 @@ export function useWagerChat(userId?: string, activeWagerId?: string) {
           timestamp: p.timestamp || p.createdAt,
           verifiedCount: p.verifications || 0,
           totalRequired: Math.max(1, wager.participants.length - 1),
-          hasVoted: false, // In real app, check if userId exists in a votes sub-node
+          hasVoted: false,
         }));
 
-        // Add a system message for wager creation
         messages.unshift({
           id: `sys-${wager.id}`,
           type: 'system',
           text: `Wager started: ${wager.title}`,
-          timestamp: new Date().toISOString(), // Mocking start time
+          timestamp: new Date().toISOString(),
         });
 
         // Determine wager status and latest action
         let status: 'red' | 'yellow' | 'green' = 'green';
-        let latestAction = 'All caught up';
+        let latestAction = 'Challenge active';
 
-        const myLastProof = wagerProofs.find((p: any) => p.user?.id === userId);
-        const today = new Date().toDateString();
-        const hasUploadedToday = myLastProof && new Date(myLastProof.timestamp).toDateString() === today;
+        if (wager.dbStatus === 'resolved') {
+          latestAction = 'Challenge Resolved: Winner decided!';
+        } else if (wager.isStreak) {
+          const myLastProof = wagerProofs.find((p: any) => p.user?.id === userId);
+          const today = new Date().toDateString();
+          const hasUploadedToday = myLastProof && new Date(myLastProof.timestamp).toDateString() === today;
 
-        if (!hasUploadedToday) {
-          status = 'red';
-          latestAction = 'You need to upload proof';
-        } else {
-          // Check if there are proofs from others that I haven't voted on
-          const pendingVotes = wagerProofs.filter((p: any) => p.user?.id !== userId && (p.verifications || 0) < (wager.participants.length - 1));
-          if (pendingVotes.length > 0) {
-            status = 'yellow';
-            latestAction = 'Jury Duty: Vote on proofs';
+          if (!hasUploadedToday) {
+            status = 'red';
+            latestAction = 'You need to upload proof today!';
           }
+        }
+
+        // Jury duty check still applies to everyone
+        const pendingVotes = wagerProofs.filter((p: any) => p.user?.id !== userId && (p.verifications || 0) < (wager.participants.length - 1));
+        if (status !== 'red' && pendingVotes.length > 0) {
+          status = 'yellow';
+          latestAction = 'Jury Duty: Vote on proofs';
+        }
+
+        if (wager.dbStatus === 'resolved') {
+          latestAction = 'Challenge Resolved • Winner Awarded';
+        } else if (wagerProofs.length > 0) {
+          const lastProof = wagerProofs[wagerProofs.length - 1];
+          const uploaderName = lastProof?.user?.name ?? lastProof?.sender?.name ?? 'Someone';
+          latestAction = `${uploaderName} uploaded proof`;
         }
 
         return {
           ...wager,
           messages: messages.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()),
           status,
-          latestAction: wagerProofs.length > 0 ? `${wagerProofs[wagerProofs.length - 1].user.name} uploaded proof` : latestAction,
+          latestAction,
         };
       }));
 
@@ -166,6 +207,11 @@ export function useWagerChat(userId?: string, activeWagerId?: string) {
     fetchMessages();
   };
 
+  const wagersNeedingGrant = useMemo(
+    () => wagers.filter(w => w.needsGrant),
+    [wagers]
+  );
+
   return {
     wagers,
     activeWager,
@@ -174,6 +220,8 @@ export function useWagerChat(userId?: string, activeWagerId?: string) {
     handleVote,
     handleUpload,
     hasUploadedToday,
-    refresh: fetchMessages
+    refresh: fetchMessages,
+    refreshWagers: fetchWagers,
+    wagersNeedingGrant,
   };
 }

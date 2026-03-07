@@ -7,7 +7,7 @@ import { ref, onValue } from "firebase/database";
 
 interface Transaction {
   id: string;
-  type: "payout" | "refill";
+  type: "payout" | "refill" | "stake";
   amount: number;
   description: string;
   timestamp: string;
@@ -21,9 +21,11 @@ export default function TransactionLedger() {
   useEffect(() => {
     const claimsRef = ref(db, "claims");
     const grantsRef = ref(db, "pool/grants");
+    const wagersRef = ref(db, "wagers");
 
     let claimsData: any[] = [];
     let grantsData: any[] = [];
+    let wagersData: any[] = [];
 
     const unsubscribeClaims = onValue(claimsRef, (snapshot) => {
       const data = snapshot.val();
@@ -46,6 +48,7 @@ export default function TransactionLedger() {
           })
           .filter(Boolean) as Transaction[];
       }
+      console.log(">>> [LEDGER] Claims Data Updated:", claimsData.length);
       combineAndSort();
     });
 
@@ -61,11 +64,51 @@ export default function TransactionLedger() {
           status: "completed",
         })) as Transaction[];
       }
+      console.log(">>> [LEDGER] Grants Data Updated:", grantsData.length);
+      combineAndSort();
+    });
+
+    const unsubscribeWagers = onValue(wagersRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const extracted: Transaction[] = [];
+        Object.entries(data).forEach(([id, val]: [string, any]) => {
+          // 1. Record individual stake commitments for ALL participants (Historical & Active)
+          const participants = val.participants || [];
+          participants.forEach((p: any, index: number) => {
+            if (p.stakedAmount > 0) {
+              extracted.push({
+                id: `${id}-stake-${p.uid || index}`,
+                type: "stake",
+                amount: p.stakedAmount,
+                description: `Stake Authorized: ${p.name || 'User'} (${val.title})`,
+                timestamp: p.joinedAt || val.createdAt || new Date().toISOString(),
+                status: "escrowed",
+              });
+            }
+          });
+
+          // 2. Record winner payouts (only if resolved)
+          if (val.status === 'resolved' && val.payouts?.winnerAmount > 0) {
+            extracted.push({
+              id: `${id}-payout`,
+              type: "payout",
+              amount: val.payouts.winnerAmount / 100, // payouts are usually in cents
+              description: `Match Winner Payout: ${val.title}`,
+              timestamp: val.resolvedAt || val.createdAt || new Date().toISOString(),
+              status: "completed",
+            });
+          }
+        });
+        wagersData = extracted;
+      }
+      console.log(">>> [LEDGER] Wagers/Stakes Data Updated:", wagersData.length);
       combineAndSort();
     });
 
     const combineAndSort = () => {
-      const combined = [...claimsData, ...grantsData];
+      const combined = [...claimsData, ...grantsData, ...wagersData];
+      console.log(">>> [LEDGER] Combining data. Total entries:", combined.length);
       combined.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
       setTransactions(combined);
       setLoading(false);
@@ -74,6 +117,7 @@ export default function TransactionLedger() {
     return () => {
       unsubscribeClaims();
       unsubscribeGrants();
+      unsubscribeWagers();
     };
   }, []);
 
@@ -110,9 +154,15 @@ export default function TransactionLedger() {
                 <tr key={tx.id} className="group hover:bg-white/[0.02] transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg ${tx.type === 'payout' ? 'bg-orange-500/10' : 'bg-green-500/10'}`}>
+                      <div className={`p-2 rounded-lg ${
+                        tx.type === 'payout' ? 'bg-orange-500/10' : 
+                        tx.type === 'stake' ? 'bg-indigo-500/10' : 
+                        'bg-green-500/10'
+                      }`}>
                         {tx.type === 'payout' ? (
-                          <ArrowUpRight className={`w-4 h-4 ${tx.type === 'payout' ? 'text-orange-400' : 'text-green-400'}`} />
+                          <ArrowUpRight className="w-4 h-4 text-orange-400" />
+                        ) : tx.type === 'stake' ? (
+                          <Wallet className="w-4 h-4 text-indigo-400" />
                         ) : (
                           <ArrowDownLeft className="w-4 h-4 text-green-400" />
                         )}
@@ -125,14 +175,20 @@ export default function TransactionLedger() {
                   </td>
                   <td className="px-6 py-4">
                     <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${
-                      tx.type === 'payout' ? 'text-orange-400 bg-orange-400/10' : 'text-green-400 bg-green-400/10'
+                      tx.type === 'payout' ? 'text-orange-400 bg-orange-400/10' : 
+                      tx.type === 'stake' ? 'text-indigo-400 bg-indigo-400/10' : 
+                      'text-green-400 bg-green-400/10'
                     }`}>
-                      {tx.type === 'payout' ? 'Payout' : 'Refill'}
+                      {tx.type === 'payout' ? 'Payout' : tx.type === 'stake' ? 'Stake' : 'Refill'}
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    <p className={`text-sm font-bold ${tx.type === 'payout' ? 'text-slate-200' : 'text-green-400'}`}>
-                      {tx.type === 'payout' ? '-' : '+'}${tx.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    <p className={`text-sm font-bold ${
+                      tx.type === 'payout' ? 'text-slate-200' : 
+                      tx.type === 'stake' ? 'text-indigo-400' : 
+                      'text-green-400'
+                    }`}>
+                      {tx.type === 'payout' ? '-' : tx.type === 'stake' ? '•' : '+'}${tx.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
                   </td>
                   <td className="px-6 py-4">

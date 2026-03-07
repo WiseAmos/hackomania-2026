@@ -43,10 +43,15 @@ export default function ClaimsDashboard() {
     const unsubscribe = onValue(claimsRef, (snapshot) => {
       const data = snapshot.val()
       if (data) {
-        const parsedClaims = Object.values(data) as UnifiedResponse[]
+        const allData = Object.values(data) as any[]
+        // Filter out claims that are still in the initial "verifying" phase (missing manifest)
+        const parsedClaims = allData.filter(c => c && c.claim_manifest) as UnifiedResponse[]
+        
         // Sort by submission date DESC
         parsedClaims.sort((a, b) => {
-          return new Date(b.claim_manifest.submission_date).getTime() - new Date(a.claim_manifest.submission_date).getTime()
+          const dateA = a.claim_manifest?.submission_date ? new Date(a.claim_manifest.submission_date).getTime() : 0
+          const dateB = b.claim_manifest?.submission_date ? new Date(b.claim_manifest.submission_date).getTime() : 0
+          return dateB - dateA
         })
         setClaims(parsedClaims)
       } else {
@@ -153,6 +158,10 @@ export default function ClaimsDashboard() {
         <div className="flex items-center gap-4">
           <Link href="/claims/submit" className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium transition-colors border border-white/5">
             Submit New Claim
+          </Link>
+          <div className="h-6 w-px bg-white/10 mx-2" />
+          <Link href="/debug/ilp-test" className="px-4 py-2 rounded-lg bg-[#6366F1]/10 text-[#6366F1] text-sm font-bold transition-colors border border-[#6366F1]/20 hover:bg-[#6366F1]/20">
+            Protocol Lab
           </Link>
           <div className="h-6 w-px bg-white/10 mx-2" />
           <button 

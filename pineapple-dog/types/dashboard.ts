@@ -23,8 +23,10 @@ export interface Participant {
   avatar: string;
   handle: string;
   walletAddress?: string;
-  status: 'alive' | 'eliminated';
+  grantId?: string;        // Per-player grant ID (ILP authorization)
+  status: 'alive' | 'eliminated' | 'winner';
   stakedAmount: number;
+  joinedAt?: string;
 }
 
 export interface Wager {
@@ -33,16 +35,22 @@ export interface Wager {
   description: string;
   deadline: string;
   timeRemaining: string;
-  player1: Participant;
-  player2: Participant;
+  poolExpiry?: string;
+  participants: Participant[];
   totalStake: number;
-  status: 'active' | 'resolved' | 'awaiting_auth';
+  status: 'active' | 'resolved' | 'expired' | 'awaiting_auth';
   winner?: string;
+  winners?: string[];
+  /** @deprecated Use participant.grantId instead */
   grantId?: string;
   imageUrl?: string;
   createdAt?: string;
-  // Compat: carousel still uses participants array
-  participants?: Participant[];
+  stakeAmount: number;
+  type: 'competitive' | 'personal' | 'global';
+  isStreak?: boolean;
+  // Legacy compat
+  player1?: Participant;
+  player2?: Participant;
 }
 
 export interface ProofPost {

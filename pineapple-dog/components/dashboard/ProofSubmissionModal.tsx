@@ -137,8 +137,8 @@ export function ProofSubmissionModal({ isOpen, onClose, wager, hasUploadedToday,
     setStatus('processing');
 
     try {
-      if (hasUploadedToday) {
-        alert('You have already submitted proof for today!');
+      if (wager.isStreak && hasUploadedToday) {
+        alert('You have already submitted proof for today for this streak challenge!');
         return;
       }
 

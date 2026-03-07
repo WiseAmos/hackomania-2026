@@ -1,6 +1,7 @@
 "use client"
 import { useEffect, useState } from "react"
-import { ArrowLeft, Clock, ThumbsUp } from "lucide-react"
+import { ArrowLeft, Clock, ThumbsUp, X, MapPin, Calendar, FileText, Info, ShieldCheck } from "lucide-react"
+import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
 import { useAuth } from "../../lib/AuthContext"
 import { db } from "../../lib/firebase"
@@ -129,7 +130,7 @@ export default function ClaimsDashboard() {
 
   // --- Utility render stuff for Details view ---
   const renderDetails = (manifest: ClaimManifest) => {
-    if (manifest.category_details.property) {
+    if (manifest.category_details?.property) {
       return (
         <div className="mt-4 p-4 rounded-lg bg-slate-800/50 border border-slate-700">
           <h4 className="font-semibold text-slate-300 mb-2">Property Details</h4>
@@ -138,7 +139,7 @@ export default function ClaimsDashboard() {
         </div>
       )
     }
-    if (manifest.category_details.presence) {
+    if (manifest.category_details?.presence) {
       return (
         <div className="mt-4 p-4 rounded-lg bg-slate-800/50 border border-slate-700">
           <h4 className="font-semibold text-slate-300 mb-2">Presence Logs</h4>
@@ -147,7 +148,7 @@ export default function ClaimsDashboard() {
         </div>
       )
     }
-    if (manifest.category_details.livelihood) {
+    if (manifest.category_details?.livelihood) {
       return (
         <div className="mt-4 p-4 rounded-lg bg-slate-800/50 border border-slate-700">
           <h4 className="font-semibold text-slate-300 mb-2">Livelihood Disruption</h4>
@@ -232,7 +233,6 @@ export default function ClaimsDashboard() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {claims.map((claim) => {
                 const manifest = claim.claim_manifest
-                const isSelected = selectedClaim?.claim_manifest.claim_id === manifest.claim_id
                 const hasVoted = user && manifest.votes?.voterIds?.includes(user.uid)
                 const tierColor = claim.verification_results.triage_tier === 1 ? 'text-green-400 bg-green-400/10' :
                   claim.verification_results.triage_tier === 2 ? 'text-yellow-400 bg-yellow-400/10' :
@@ -241,9 +241,8 @@ export default function ClaimsDashboard() {
                 return (
                   <div
                     key={manifest.claim_id}
-                    className={`flex flex-col p-6 rounded-2xl border backdrop-blur-xl transition-all duration-300 ${isSelected ? 'bg-slate-800/80 border-[#6366F1]/50 ring-1 ring-[#6366F1]/50' : 'bg-slate-800/40 border-white/5 hover:bg-slate-800/60 hover:border-white/10 cursor-pointer'
-                      }`}
-                    onClick={() => !isSelected && setSelectedClaim(claim)}
+                    className="flex flex-col p-6 rounded-2xl border backdrop-blur-xl transition-all duration-300 bg-slate-800/40 border-white/5 hover:bg-slate-800/60 hover:border-white/10 cursor-pointer"
+                    onClick={() => setSelectedClaim(claim)}
                   >
                     <div className="flex justify-between items-start mb-4">
                       <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${tierColor}`}>
@@ -264,43 +263,36 @@ export default function ClaimsDashboard() {
                         <span className="text-sm font-semibold text-slate-300">{manifest.votes?.count || 0} Votes</span>
                       </div>
 
-                      {claim.verification_results.triage_tier !== 1 && (
-                        <button
+                      <div className="flex items-center gap-3">
+                        {claim.verification_results.triage_tier !== 1 && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleVote(manifest.claim_id);
+                            }}
+                            disabled={votingState[manifest.claim_id]}
+                            className={`flex items-center justify-center w-10 h-10 rounded-full transition-all ${votingState[manifest.claim_id] ? 'opacity-50 cursor-not-allowed bg-slate-700' :
+                              hasVoted ? 'bg-[#6366F1] text-white' : 'bg-slate-700/50 hover:bg-slate-700 text-slate-400 hover:text-white'
+                              }`}
+                          >
+                            {votingState[manifest.claim_id] ? (
+                              <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                            ) : (
+                              <ThumbsUp className={`w-4 h-4 ${hasVoted ? 'fill-current' : ''}`} />
+                            )}
+                          </button>
+                        )}
+                        <button 
+                          className="px-3 py-1.5 rounded-lg bg-[#6366F1]/10 text-[#6366F1] text-xs font-bold hover:bg-[#6366F1]/20 transition-colors"
                           onClick={(e) => {
                             e.stopPropagation();
-                            toggleVote(manifest.claim_id);
+                            setSelectedClaim(claim);
                           }}
-                          disabled={votingState[manifest.claim_id]}
-                          className={`flex items-center justify-center w-10 h-10 rounded-full transition-all ${votingState[manifest.claim_id] ? 'opacity-50 cursor-not-allowed bg-slate-700' :
-                            hasVoted ? 'bg-[#6366F1] text-white' : 'bg-slate-700/50 hover:bg-slate-700 text-slate-400 hover:text-white'
-                            }`}
                         >
-                          {votingState[manifest.claim_id] ? (
-                            <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                          ) : (
-                            <ThumbsUp className={`w-4 h-4 ${hasVoted ? 'fill-current' : ''}`} />
-                          )}
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Expanded Detail View */}
-                    {isSelected && (
-                      <div className="mt-6 pt-4 border-t border-white/10 animate-in fade-in slide-in-from-top-4 duration-300">
-                        <p className="text-sm text-slate-300 leading-relaxed mb-4">{manifest.description}</p>
-                        {renderDetails(manifest)}
-
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedClaim(null);
-                          }}
-                          className="mt-6 w-full py-2 text-xs text-slate-400 hover:text-white transition-colors"
-                        >
-                          Close Details
+                          View Details
                         </button>
                       </div>
-                    )}
+                    </div>
                   </div>
                 )
               })}
@@ -308,6 +300,122 @@ export default function ClaimsDashboard() {
           )
         )}
       </div>
+
+      {/* Detail Modal Overlay */}
+      <AnimatePresence>
+        {selectedClaim && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-10">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedClaim(null)}
+              className="absolute inset-0 bg-slate-950/80 backdrop-blur-md"
+            />
+            
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-2xl bg-slate-900 border border-white/10 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between p-6 border-b border-white/5 bg-white/[0.02]">
+                <div className="flex items-center gap-3">
+                  <div className={`px-3 py-1 rounded-full text-xs font-bold ${
+                    selectedClaim.verification_results.triage_tier === 1 ? 'text-green-400 bg-green-400/10' :
+                    selectedClaim.verification_results.triage_tier === 2 ? 'text-yellow-400 bg-yellow-400/10' :
+                    'text-orange-400 bg-orange-400/10'
+                  }`}>
+                    Tier {selectedClaim.verification_results.triage_tier}
+                  </div>
+                  <h2 className="text-xl font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
+                    Claim Details
+                  </h2>
+                </div>
+                <button 
+                  onClick={() => setSelectedClaim(null)}
+                  className="p-2 rounded-full hover:bg-white/5 text-slate-400 hover:text-white transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              {/* Scrollable Content */}
+              <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-8">
+                {/* Basic Info */}
+                <section>
+                  <h3 className="text-2xl font-bold text-white mb-2">{selectedClaim.claim_manifest.title}</h3>
+                  <div className="flex flex-wrap gap-4 text-sm text-slate-400 mb-4">
+                    <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4 text-[#6366F1]" /> {new Date(selectedClaim.claim_manifest.submission_date).toLocaleDateString()}</span>
+                    <span className="flex items-center gap-1.5"><FileText className="w-4 h-4 text-[#6366F1]" /> ID: {selectedClaim.claim_manifest.claim_id.slice(0, 8)}...</span>
+                    {selectedClaim.claim_manifest.disaster_info.location && (
+                      <span className="flex items-center gap-1.5"><MapPin className="w-4 h-4 text-[#6366F1]" /> {selectedClaim.claim_manifest.disaster_info.location}</span>
+                    )}
+                  </div>
+                  <div className="bg-slate-800/40 rounded-2xl p-5 border border-white/5">
+                    <p className="text-slate-300 leading-relaxed">{selectedClaim.claim_manifest.description}</p>
+                  </div>
+                </section>
+
+                {/* Amount & Status */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-[#6366F1]/5 border border-[#6366F1]/20 rounded-2xl p-4">
+                    <p className="text-xs text-slate-500 uppercase font-bold tracking-wider mb-1">Requested Amount</p>
+                    <p className="text-3xl font-bold text-[#6366F1]">${selectedClaim.claim_manifest.amount_requested.toLocaleString()}</p>
+                  </div>
+                  <div className="bg-slate-800/40 border border-white/5 rounded-2xl p-4">
+                    <p className="text-xs text-slate-500 uppercase font-bold tracking-wider mb-1">Verification Status</p>
+                    <p className="text-xl font-bold text-slate-200">{selectedClaim.verification_results.disbursement.status.replace(/_/g, ' ')}</p>
+                  </div>
+                </div>
+
+                {/* Verification Results Details */}
+                <section className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-5 h-5 text-green-400" />
+                    <h4 className="font-bold text-slate-200">AI Assessment Audit</h4>
+                  </div>
+                  <div className="bg-slate-800/20 border border-white/10 rounded-2xl p-6 space-y-4">
+                    <div className="flex justify-between items-center pb-4 border-b border-white/5">
+                      <span className="text-slate-400">Calculated Credibility Score</span>
+                      <span className="text-2xl font-bold text-white">{selectedClaim.verification_results.calculated_score}/100</span>
+                    </div>
+                    <div>
+                      <h5 className="text-sm font-bold text-slate-400 uppercase tracking-tight mb-2 flex items-center gap-1.5">
+                        <Info className="w-4 h-4" /> Logic Explanation
+                      </h5>
+                      <p className="text-sm text-slate-300 italic leading-relaxed">
+                        "{selectedClaim.verification_results.analysis_explanation}"
+                      </p>
+                    </div>
+                  </div>
+                </section>
+
+                {/* Category Details */}
+                <section className="space-y-4">
+                   <h4 className="font-bold text-slate-200">Evidence Verification</h4>
+                   {renderDetails(selectedClaim.claim_manifest)}
+                </section>
+              </div>
+
+              {/* Footer */}
+              <div className="p-6 border-t border-white/5 bg-white/[0.01] flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <ThumbsUp className="w-5 h-5 text-[#6366F1]" />
+                  <span className="text-sm font-bold text-slate-300">{selectedClaim.claim_manifest.votes?.count || 0} Community Votes</span>
+                </div>
+                <button 
+                  onClick={() => setSelectedClaim(null)}
+                  className="px-6 py-2.5 rounded-xl font-bold text-sm bg-white/5 text-white hover:bg-white/10 transition-all border border-white/10"
+                >
+                  Close
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </main>
   )
 }

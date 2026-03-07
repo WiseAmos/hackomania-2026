@@ -25,6 +25,13 @@ export default function TransactionLedger() {
     let claimsData: any[] = [];
     let grantsData: any[] = [];
 
+    const combineAndSort = () => {
+      const combined = [...claimsData, ...grantsData];
+      combined.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      setTransactions(combined);
+      setLoading(false);
+    };
+
     const unsubscribeClaims = onValue(claimsRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
@@ -63,13 +70,6 @@ export default function TransactionLedger() {
       }
       combineAndSort();
     });
-
-    const combineAndSort = () => {
-      const combined = [...claimsData, ...grantsData];
-      combined.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-      setTransactions(combined);
-      setLoading(false);
-    };
 
     return () => {
       unsubscribeClaims();

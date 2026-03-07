@@ -50,6 +50,11 @@ export async function GET(req: NextRequest) {
 
         const wallet = await client.walletAddress.get({ url: walletUrl });
 
+        // Generate a new Wager ID if none exists BEFORE configuring the redirect URI
+        if (!wagerId || wagerId === "NEW") {
+            wagerId = crypto.randomUUID();
+        }
+
         // Request an interactive outgoing payment grant (per Open Payments docs)
         const grant = await client.grant.request(
             { url: wallet.authServer },
@@ -74,7 +79,7 @@ export async function GET(req: NextRequest) {
                     start: ["redirect"],
                     finish: {
                         method: "redirect",
-                        uri: `${BASE_URL}/wager?player=${player}&wagerId=${wagerId ?? "NEW"}`,
+                        uri: `${BASE_URL}/wager?player=${player}&wagerId=${wagerId}`,
                         nonce: NONCE,
                     },
                 },
@@ -88,11 +93,10 @@ export async function GET(req: NextRequest) {
             );
         }
 
-        // Create a new wager if player1 is initiating
         const grantId = crypto.randomUUID();
 
-        if (!wagerId || wagerId === "NEW") {
-            wagerId = crypto.randomUUID();
+        // (Legacy) local memory store — keeping for compat if components still optionally read it
+        if (player === "player1") {
             addWager({
                 id: wagerId,
                 title,

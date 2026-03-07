@@ -8,33 +8,38 @@ import { adminDb } from "../../../lib/firebaseAdmin";
 export async function GET(req: NextRequest) {
     try {
         const userId = req.nextUrl.searchParams.get("userId");
+        if (!userId) {
+            // Unauthenticated or not providing userId: return nothing.
+            // Wagers should only be visible to involved users.
+            return NextResponse.json([]);
+        }
+
         const wagersRef = adminDb.ref("wagers");
 
-        let snap;
-        if (userId) {
-            snap = await wagersRef.orderByChild("player1/uid").equalTo(userId).once("value");
-            const data1: Record<string, unknown>[] = [];
-            snap.forEach((child) => {
-                data1.push({ id: child.key, ...child.val() });
-            });
+        // Find where user is player1
+        const snap1 = await wagersRef.orderByChild("player1/uid").equalTo(userId).once("value");
+        const data: Record<string, unknown>[] = [];
+        snap1.forEach((child) => {
+            data.push({ id: child.key, ...child.val() });
+        });
 
-            // Also check player2
-            const snap2 = await wagersRef.orderByChild("player2/uid").equalTo(userId).once("value");
-            snap2.forEach((child) => {
-                if (!data1.find((w: Record<string, unknown>) => w.id === child.key)) {
-                    data1.push({ id: child.key, ...child.val() });
-                }
-            });
-
-            return NextResponse.json(data1);
-        } else {
-            snap = await wagersRef.orderByChild("createdAt").limitToLast(50).once("value");
-            const data: Record<string, unknown>[] = [];
-            snap.forEach((child) => {
+        // Find where user is player2
+        const snap2 = await wagersRef.orderByChild("player2/uid").equalTo(userId).once("value");
+        snap2.forEach((child) => {
+            // Avoid duplicates if a user somehow played themselves
+            if (!data.find((w: Record<string, unknown>) => w.id === child.key)) {
                 data.push({ id: child.key, ...child.val() });
-            });
-            return NextResponse.json(data.reverse());
-        }
+            }
+        });
+
+        // Sort by createdAt descending
+        data.sort((a, b) => {
+            const timeA = new Date((a.createdAt as string) || 0).getTime();
+            const timeB = new Date((b.createdAt as string) || 0).getTime();
+            return timeB - timeA;
+        });
+
+        return NextResponse.json(data);
     } catch (err) {
         console.error("[api/wagers GET]", err);
         return NextResponse.json({ error: String(err) }, { status: 500 });

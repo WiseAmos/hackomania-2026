@@ -20,11 +20,18 @@ router.get("/", async (req: Request, res: Response) => {
     const client = await getOpenPaymentsClient();
     const NONCE = generateNonce();
 
+    // Parse standard Open Payments payment pointers (e.g., $ilp.interledger-test.dev/james)
+    const senderUrl = senderwalletid.startsWith("$")
+      ? senderwalletid.replace("$", "https://")
+      : senderwalletid.startsWith("http")
+        ? senderwalletid
+        : `https://ilp.interledger-test.dev/${senderwalletid}`;
+
     const senderWallet = await client.walletAddress.get({
-      url: `https://ilp.interledger-test.dev/${senderwalletid}`,
+      url: senderUrl,
     });
 
-    // Outgoing payment grant (interactive — requires user redirect)
+    // Outgoing payment grant and Quote grant bundled into one interactive request
     const grant = await client.grant.request(
       { url: senderWallet.authServer },
       {
@@ -42,6 +49,10 @@ router.get("/", async (req: Request, res: Response) => {
                 },
               },
             },
+            {
+              type: "quote",
+              actions: ["create", "read"]
+            }
           ],
         },
         interact: {
@@ -59,19 +70,9 @@ router.get("/", async (req: Request, res: Response) => {
       return res.status(500).json({ message: "Expected interactive grant" });
     }
 
-    // Quote grant (non-interactive)
-    const quoteGrant = await client.grant.request(
-      { url: senderWallet.authServer },
-      {
-        access_token: {
-          access: [{ type: "quote", actions: ["create", "read"] }],
-        },
-      }
-    );
-
-    // Persist tokens
+    // Persist unified token
     await rtdb.ref(`users/${uid}`).update({
-      "ilp/quotegrant": (quoteGrant as { access_token: { value: string } }).access_token.value,
+      "ilp/quotegrant": grant.continue.access_token.value,
       "ilp/outgoinggrant": grant.continue.access_token.value,
       "ilp/outgoinggranturl": grant.continue.uri,
     });
@@ -84,6 +85,26 @@ router.get("/", async (req: Request, res: Response) => {
   } catch (err) {
     console.error("[transaction] grant request error:", err);
     return res.status(500).json({ message: "Failed to request grant" });
+  }
+});
+
+// POST /api/transaction/interact
+// Stores the interact_ref after the user redirects back from the ILP auth
+router.post("/interact", async (req: Request, res: Response) => {
+  const { uid, interact_ref, hash } = req.body;
+  if (!uid || !interact_ref) {
+    return res.status(400).json({ message: "Missing uid or interact_ref" });
+  }
+
+  try {
+    await rtdb.ref(`users/${uid}/ilp`).update({
+      interactref: interact_ref,
+      hash: hash || "",
+    });
+    return res.json({ success: true });
+  } catch (err) {
+    console.error("[transaction/interact] error:", err);
+    return res.status(500).json({ message: "Failed to store interact ref" });
   }
 });
 

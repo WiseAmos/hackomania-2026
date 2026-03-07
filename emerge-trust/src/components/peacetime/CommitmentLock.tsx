@@ -33,6 +33,10 @@ function CommitmentLock({ onLocked }: CommitmentLockProps) {
     });
 
     if (grantResponse) {
+      sessionStorage.setItem(
+        "pendingWager",
+        JSON.stringify({ goal, amount: parseFloat(amount), deadline, walletId })
+      );
       // Redirect user to authorize the Open Payments grant
       window.location.href = grantResponse.grantUrl;
       setLocked(true);

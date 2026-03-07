@@ -1,58 +1,68 @@
 import { Router, type Request, type Response } from "express";
-import { db } from "../lib/firebaseAdmin";
-import { getOpenPaymentsClient } from "../lib/openPaymentsClient";
-import { FieldValue } from "firebase-admin/firestore";
+import { rtdb } from "../lib/firebaseAdmin";
 
 const router = Router();
 
-const VAULT_WALLET = process.env.VAULT_WALLET_ADDRESS ?? "";
-const CLAIM_WALLET = process.env.EMERGETRUST_WALLET_ADDRESS ?? "";
-
-// ─── Submit claim (Tier 1 instant payout) ────────────────────────────────────
+// ─── Submit claim (Phase 1 Bot Scoring) ────────────────────────────────────
 // POST /api/claims
 router.post("/", async (req: Request, res: Response) => {
-  const claim = req.body;
+  // We parse it assuming 'claim' is just sent as JSON or multipart form
+  const claimStr = req.body.claim;
+  let claim;
+  try {
+    claim = typeof claimStr === "string" ? JSON.parse(claimStr) : claimStr;
+  } catch (err) {
+    return res.status(400).json({ message: "Invalid claim JSON" });
+  }
 
-  if (!claim.userId || !claim.zoneId || !claim.requestedAmount) {
-    return res.status(400).json({ message: "Missing required claim fields" });
+  if (!claim || !claim.userId || !claim.zoneId || !claim.requestedAmount || !claim.category) {
+    return res.status(400).json({ message: "Missing required claim fields including category" });
   }
 
   try {
     // Verify zone is active
-    const zoneSnap = await db.collection("disasterZones").doc(claim.zoneId).get();
-    if (!zoneSnap.exists || zoneSnap.data()?.status !== "active") {
+    const zoneSnap = await rtdb.ref(`disasterZones/${claim.zoneId}`).get();
+    if (!zoneSnap.exists() || zoneSnap.val()?.status !== "active") {
       return res.status(403).json({ message: "Zone is not in active disaster state" });
     }
 
     const tier1Amount = Math.round(claim.requestedAmount * 0.2);
     const tier2Amount = claim.requestedAmount - tier1Amount;
 
-    // Create claim document
-    const claimRef = await db.collection("claims").add({
+    // The $5 Stake verification (Mocked)
+    // Here we would verify that an incoming payment of $5 was authorized/received.
+
+    // Create claim document in RTDB
+    const claimRef = rtdb.ref("claims").push();
+    const claimId = claimRef.key;
+
+    if (!claimId) throw new Error("Could not generate claim ID");
+
+    await claimRef.set({
       ...claim,
+      id: claimId,
       status: "pending",
       tier1Amount,
       tier2Amount,
+      botScore: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
 
-    // Trigger Tier 1 instant payout (20%)
-    await releaseTier1Payout(claimRef.id, claim.userId, tier1Amount);
+    // Fire-and-forget the Phase 1 Bot Scorer 
+    const baseUrl = process.env.BASE_URL ?? "http://localhost:3001";
+    fetch(`${baseUrl}/api/oracle/score`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        claimId,
+        category: claim.category,
+        userId: claim.userId,
+        zoneId: claim.zoneId
+      })
+    }).catch(err => console.error("Failed to trigger scoring bot:", err));
 
-    // Set voting deadline (24 hours from now)
-    const votingDeadline = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-    await claimRef.update({
-      status: "tier1_paid",
-      votingDeadlineAt: votingDeadline,
-    });
-
-    // After a delay, move to "voting" status
-    setTimeout(async () => {
-      await claimRef.update({ status: "voting" });
-    }, 2000);
-
-    return res.status(201).json({ claimId: claimRef.id });
+    return res.status(201).json({ claimId });
   } catch (err) {
     console.error("[claims/post] error:", err);
     return res.status(500).json({ message: "Failed to submit claim" });
@@ -65,42 +75,41 @@ router.post("/:claimId/resolve", async (req: Request, res: Response) => {
   const { claimId } = req.params;
 
   try {
-    const claimSnap = await db.collection("claims").doc(claimId).get();
-    if (!claimSnap.exists) {
+    const claimSnap = await rtdb.ref(`claims/${claimId}`).get();
+    if (!claimSnap.exists()) {
       return res.status(404).json({ message: "Claim not found" });
     }
 
-    const claim = claimSnap.data()!;
+    const claim = claimSnap.val()!;
 
     // Tally votes
-    const votesSnap = await db
-      .collection("votes")
-      .where("claimId", "==", claimId)
-      .get();
+    const votesSnap = await rtdb.ref("votes").orderByChild("claimId").equalTo(claimId).get();
 
     let weightedApprove = 0;
     let weightedReject = 0;
 
-    for (const voteDoc of votesSnap.docs) {
-      const vote = voteDoc.data();
-      const weight = Math.max(1, vote.trustScoreAtVote ?? 1);
-      if (vote.choice === "approve") {
-        weightedApprove += weight;
-      } else {
-        weightedReject += weight;
-      }
+    if (votesSnap.exists()) {
+      votesSnap.forEach((voteDoc) => {
+        const vote = voteDoc.val();
+        const weight = Math.max(1, vote.trustScoreAtVote ?? 1);
+        if (vote.choice === "approve") {
+          weightedApprove += weight;
+        } else {
+          weightedReject += weight;
+        }
+      });
     }
 
     const outcome = weightedApprove >= weightedReject ? "approved" : "rejected";
 
     if (outcome === "approved") {
       await releaseTier2Payout(claimId, claim.userId, claim.tier2Amount);
-      await claimSnap.ref.update({
+      await rtdb.ref(`claims/${claimId}`).update({
         status: "tier2_paid",
         updatedAt: new Date().toISOString(),
       });
     } else {
-      await claimSnap.ref.update({
+      await rtdb.ref(`claims/${claimId}`).update({
         status: "rejected",
         updatedAt: new Date().toISOString(),
       });
@@ -113,43 +122,6 @@ router.post("/:claimId/resolve", async (req: Request, res: Response) => {
   }
 });
 
-// ─── Admin: Simulate wager failures ──────────────────────────────────────────
-// POST /api/admin/simulate-wager-fails
-router.post("/admin/simulate-wager-fails", async (req: Request, res: Response) => {
-  const { count = 50 } = req.body as { count: number };
-
-  try {
-    // Get locked wagers (limited to count)
-    const wagersSnap = await db
-      .collection("wagers")
-      .where("status", "==", "locked")
-      .limit(count)
-      .get();
-
-    let totalStreamed = 0;
-    const batch = db.batch();
-
-    for (const wagerDoc of wagersSnap.docs) {
-      const wager = wagerDoc.data();
-      batch.update(wagerDoc.ref, { status: "streaming" });
-      totalStreamed += wager.amount;
-    }
-
-    await batch.commit();
-
-    // Update vault balance
-    await db.collection("communityVault").doc("main").update({
-      totalStreamed: FieldValue.increment(totalStreamed),
-      totalBalance: FieldValue.increment(totalStreamed),
-    });
-
-    return res.json({ processed: wagersSnap.size, totalStreamed });
-  } catch (err) {
-    console.error("[admin/simulate-wager-fails] error:", err);
-    return res.status(500).json({ message: "Simulation failed" });
-  }
-});
-
 // ─── Admin: Time travel (immediate voting resolution) ────────────────────────
 // POST /api/admin/time-travel
 router.post("/admin/time-travel", async (req: Request, res: Response) => {
@@ -159,7 +131,6 @@ router.post("/admin/time-travel", async (req: Request, res: Response) => {
     return res.status(400).json({ message: "claimId required" });
   }
 
-  // Proxy to resolve endpoint
   const resolveFetch = await fetch(
     `http://localhost:${process.env.PORT ?? 3001}/api/claims/${claimId}/resolve`,
     { method: "POST" }
@@ -171,53 +142,50 @@ router.post("/admin/time-travel", async (req: Request, res: Response) => {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-async function releaseTier1Payout(
-  claimId: string,
-  userId: string,
-  amount: number
-): Promise<void> {
-  // In full implementation, this triggers an Open Payments transfer
-  // from the CommunityVault to the user's wallet
+async function releaseTier1Payout(claimId: string, userId: string, amount: number): Promise<void> {
   console.log(`[Tier1] Releasing ${amount} for claim ${claimId} user ${userId}`);
 
-  await db.collection("communityVault").doc("main").update({
-    totalPaidOut: FieldValue.increment(amount),
-    totalBalance: FieldValue.increment(-amount),
-  });
+  try {
+    const vaultRef = rtdb.ref("communityVault/main");
+    await vaultRef.transaction((currentData) => {
+      if (currentData === null) return currentData;
+      currentData.totalPaidOut = (currentData.totalPaidOut || 0) + amount;
+      currentData.totalBalance = (currentData.totalBalance || 0) - amount;
+      return currentData;
+    });
 
-  await db.collection("payouts").add({
-    claimId,
-    userId,
-    amount,
-    tier: 1,
-    status: "completed",
-    createdAt: new Date().toISOString(),
-  });
+    await rtdb.ref("payouts").push({
+      claimId,
+      userId,
+      amount,
+      tier: 1,
+      status: "completed",
+      createdAt: new Date().toISOString(),
+    });
+  } catch (e) { console.error("Tier1 mock payout failed", e); }
 }
 
-async function releaseTier2Payout(
-  claimId: string,
-  userId: string,
-  amount: number
-): Promise<void> {
+async function releaseTier2Payout(claimId: string, userId: string, amount: number): Promise<void> {
   console.log(`[Tier2] Releasing ${amount} for claim ${claimId} user ${userId}`);
 
-  await db.collection("communityVault").doc("main").update({
-    totalPaidOut: FieldValue.increment(amount),
-    totalBalance: FieldValue.increment(-amount),
-  });
+  try {
+    const vaultRef = rtdb.ref("communityVault/main");
+    await vaultRef.transaction((currentData) => {
+      if (currentData === null) return currentData;
+      currentData.totalPaidOut = (currentData.totalPaidOut || 0) + amount;
+      currentData.totalBalance = (currentData.totalBalance || 0) - amount;
+      return currentData;
+    });
 
-  await db.collection("payouts").add({
-    claimId,
-    userId,
-    amount,
-    tier: 2,
-    status: "completed",
-    createdAt: new Date().toISOString(),
-  });
-
-  // Reward auditors who voted correctly
-  // (Implemented in full TDD phase)
+    await rtdb.ref("payouts").push({
+      claimId,
+      userId,
+      amount,
+      tier: 2,
+      status: "completed",
+      createdAt: new Date().toISOString(),
+    });
+  } catch (e) { console.error("Tier2 mock payout failed", e); }
 }
 
 export default router;

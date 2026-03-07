@@ -5,6 +5,7 @@ import "dotenv/config";
 import transactionRouter from "./routes/transaction";
 import oracleRouter from "./routes/oracle";
 import claimRouter from "./routes/claim";
+import bountyRouter from "./routes/bounty";
 
 const app = express();
 const PORT = process.env.PORT ?? 3001;
@@ -32,6 +33,7 @@ app.get("/api/health", (_req, res) => {
 app.use("/api/transaction", transactionRouter);
 app.use("/api/oracle", oracleRouter);
 app.use("/api/claims", claimRouter);
+app.use("/api/bounty", bountyRouter);
 
 // Admin simulation routes (mounted on /api/admin/*)
 app.post("/api/admin/simulate-wager-fails", (req, res) => {

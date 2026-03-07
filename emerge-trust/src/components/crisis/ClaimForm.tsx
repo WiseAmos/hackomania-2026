@@ -3,7 +3,7 @@ import { Camera, MapPin, Send } from "lucide-react";
 import Button from "@/components/ui/Button";
 import { useAppStore } from "@/store/appState";
 import { saveClaimOffline } from "@/lib/indexedDB";
-import type { GeoPoint, Claim } from "@/types";
+import type { GeoPoint, Claim, ClaimCategory } from "@/types";
 
 interface ClaimFormProps {
   zoneId: string;
@@ -17,6 +17,7 @@ function ClaimForm({ zoneId, onSubmitted }: ClaimFormProps) {
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [amount, setAmount] = useState("");
+  const [category, setCategory] = useState<ClaimCategory | "">("");
   const [geoLocation, setGeoLocation] = useState<GeoPoint | null>(null);
   const [isGeoLoading, setIsGeoLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -48,7 +49,7 @@ function ClaimForm({ zoneId, onSubmitted }: ClaimFormProps) {
   };
 
   const handleSubmit = async () => {
-    if (!user || !photoFile || !geoLocation || !amount) return;
+    if (!user || !photoFile || !geoLocation || !amount || !category) return;
 
     setIsSubmitting(true);
     setError(null);
@@ -57,8 +58,9 @@ function ClaimForm({ zoneId, onSubmitted }: ClaimFormProps) {
     const tier1Amount = Math.round(requestedAmount * 0.2);
     const tier2Amount = requestedAmount - tier1Amount;
 
-    const claimPayload: Omit<Claim, "id" | "status" | "createdAt" | "updatedAt"> = {
+    const claimPayload: Omit<Claim, "id" | "status" | "createdAt" | "updatedAt" | "botScore"> = {
       type: "individual",
+      category: category as ClaimCategory,
       userId: user.uid,
       zoneId,
       requestedAmount,
@@ -177,6 +179,34 @@ function ClaimForm({ zoneId, onSubmitted }: ClaimFormProps) {
         )}
       </div>
 
+      {/* Category Selection */}
+      <div>
+        <label className="block text-cr-muted text-xs mb-2 uppercase tracking-wider font-medium">
+          Claim Category
+        </label>
+        <div className="grid grid-cols-3 gap-2">
+          {(["property", "presence", "livelihood"] as ClaimCategory[]).map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setCategory(cat)}
+              className={`py-3 rounded-xl border text-sm font-bold capitalize transition-colors ${category === cat
+                  ? "border-cr-orange bg-cr-orange/20 text-cr-orange"
+                  : "border-cr-orange/40 bg-cr-surface text-cr-muted"
+                }`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* 5 SGD Stake Note */}
+      <div className="p-3 rounded-xl bg-cr-orange/10 border border-cr-orange/40">
+        <p className="text-cr-orange text-xs text-center font-medium">
+          ⚠️ Filing requires a $5 SGD staked deposit. Fraudulent claims lose this stake to community Bounty Hunters.
+        </p>
+      </div>
+
       {error && (
         <p className="text-cr-red text-sm font-medium" role="alert">
           {error}
@@ -189,7 +219,7 @@ function ClaimForm({ zoneId, onSubmitted }: ClaimFormProps) {
         className="w-full"
         onClick={handleSubmit}
         isLoading={isSubmitting}
-        disabled={!photoFile || !geoLocation || !amount}
+        disabled={!photoFile || !geoLocation || !amount || !category}
       >
         <Send size={18} className="mr-2" />
         Submit Claim

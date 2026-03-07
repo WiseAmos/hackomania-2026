@@ -138,6 +138,14 @@ function Home() {
             >
               Vote on Claims
             </Button>
+            <Button
+              variant="danger"
+              size="lg"
+              className="w-full bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500/20"
+              onClick={() => navigate("/bounty")}
+            >
+              Bounty Board (Slash Fraud)
+            </Button>
           </div>
         )}
       </main>

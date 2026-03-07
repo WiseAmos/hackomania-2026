@@ -33,6 +33,11 @@ function VotePage() {
           });
         });
       }
+
+      // Tiered Payout Rules Sorting (Medical/Presence > Livelihood > Property)
+      const categoryWeight: Record<string, number> = { presence: 3, livelihood: 2, property: 1 };
+      data.sort((a, b) => (categoryWeight[b.category] || 0) - (categoryWeight[a.category] || 0));
+
       setClaims(data);
       setIsLoading(false);
     });

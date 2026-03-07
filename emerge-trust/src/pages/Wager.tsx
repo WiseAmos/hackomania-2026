@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-import { ref, onValue, query, orderByChild, equalTo } from "firebase/database";
+import { ref, onValue, query, orderByChild, equalTo, push, set } from "firebase/database";
 import { db } from "@/lib/firebase";
 import { useAppStore } from "@/store/appState";
 import CommitmentLock from "@/components/peacetime/CommitmentLock";
@@ -42,6 +42,67 @@ function WagerPage() {
     });
 
     return unsubscribe;
+  }, [user]);
+
+  // Handle Open Payments ILP Redirect Callback
+  useEffect(() => {
+    if (!user) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const interactRef = params.get("interact_ref");
+    const hash = params.get("hash");
+
+    if (interactRef && hash) {
+      const pendingStr = sessionStorage.getItem("pendingWager");
+      if (pendingStr) {
+        setIsLoading(true);
+        const completeInterledger = async () => {
+          try {
+            const parsed = JSON.parse(pendingStr);
+
+            // 1. Send interactRef to backend
+            await fetch(`/api/transaction/interact`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                uid: user.uid,
+                interact_ref: interactRef,
+                hash,
+              }),
+            });
+
+            // 2. Create wager document in RTDB
+            const wagerRef = push(ref(db, "wagers"));
+            await set(wagerRef, {
+              userId: user.uid,
+              goalDescription: parsed.goal,
+              amount: Math.round(parsed.amount * 100), // store in cents (assetScale=2)
+              assetCode: "SGD",
+              assetScale: 2,
+              deadline: parsed.deadline,
+              deadlineAt: new Date(parsed.deadline).toISOString(),
+              walletId: parsed.walletId,
+              status: "locked",
+              streamedAmount: 0,
+              grantContinueToken: null,
+              grantContinueUri: null,
+              outgoingPaymentGrantToken: null,
+              createdAt: new Date().toISOString(),
+            });
+
+            // 3. Clean up
+            sessionStorage.removeItem("pendingWager");
+            window.history.replaceState({}, document.title, window.location.pathname);
+          } catch (e) {
+            console.error("Failed to complete wager lock", e);
+          } finally {
+            setIsLoading(false);
+          }
+        };
+
+        completeInterledger();
+      }
+    }
   }, [user]);
 
   return (

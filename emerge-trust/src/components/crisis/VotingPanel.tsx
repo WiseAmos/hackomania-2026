@@ -37,16 +37,33 @@ function VotingPanel({ claim, onVote, hasVoted = false, userVote }: VotingPanelP
   return (
     <Card>
       <div className="flex items-start gap-3 mb-4">
-        <div className="w-10 h-10 rounded-full bg-cr-orange/10 flex items-center justify-center shrink-0 mt-0.5">
-          <AlertTriangle size={18} className="text-cr-orange" />
+        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${claim.category === 'presence' ? 'bg-red-500/20 text-red-500' : 'bg-cr-orange/10 text-cr-orange'}`}>
+          <AlertTriangle size={18} />
         </div>
         <div className="flex-1">
-          <p className="text-cr-text font-bold text-base leading-tight">
-            Claim #{claim.id.slice(-6).toUpperCase()}
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-cr-text font-bold text-base leading-tight">
+              Claim #{claim.id.slice(-6).toUpperCase()}
+            </p>
+            {claim.category === "presence" && (
+              <span className="px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 text-[10px] uppercase font-black tracking-wider">
+                Priority: Medical
+              </span>
+            )}
+            {claim.type === "aggregated" && (
+              <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 text-[10px] uppercase font-black tracking-wider">
+                Boosted Proxy
+              </span>
+            )}
+          </div>
+          <p className="text-cr-muted text-xs mt-1">
+            Category: <span className="capitalize font-medium text-cr-text">{claim.category}</span> &bull; Zone: {claim.zoneId}
           </p>
-          <p className="text-cr-muted text-xs mt-0.5">
-            Zone: {claim.zoneId} &bull; {claim.type}
-          </p>
+          {claim.botScore !== null && (
+            <p className="text-cr-muted text-xs mt-0.5">
+              Bot Score: <span className="font-mono text-cr-orange">{claim.botScore}/100</span>
+            </p>
+          )}
         </div>
         <div className="text-right shrink-0">
           <p className="text-cr-orange font-black text-xl">${amount.toFixed(2)}</p>
@@ -70,6 +87,14 @@ function VotingPanel({ claim, onVote, hasVoted = false, userVote }: VotingPanelP
             : "Voting window closing"}
         </div>
       )}
+
+      {/* Similarity Anti-Fraud Context */}
+      <div className="mb-4 p-3 rounded-xl bg-cr-surface border border-cr-orange/20 text-xs text-cr-muted flex items-center justify-between">
+        <span>See a duplicate image on the map?</span>
+        <button className="text-cr-orange font-semibold hover:underline px-2 py-1 bg-cr-orange/10 rounded-lg transition-colors flex-shrink-0 ml-2">
+          Flag to Bounty Hunters
+        </button>
+      </div>
 
       {localVote ? (
         <div className="flex items-center justify-center gap-2 py-3 rounded-xl bg-cr-surface border border-cr-orange/30">

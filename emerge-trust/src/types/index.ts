@@ -60,6 +60,7 @@ export interface Wager {
 // ─── Claims ───────────────────────────────────────────────────────────────────
 
 export type ClaimType = "individual" | "aggregated";
+export type ClaimCategory = "property" | "presence" | "livelihood";
 export type ClaimStatus =
   | "pending"
   | "tier1_paid"
@@ -71,6 +72,8 @@ export type ClaimStatus =
 export interface Claim {
   id: string;
   type: ClaimType;
+  category: ClaimCategory;
+  botScore: number | null;
   userId: string;
   zoneId: string;
   status: ClaimStatus;
@@ -148,7 +151,7 @@ export interface SimulationConfig {
 
 export interface OfflineClaim {
   localId: string;
-  claim: Omit<Claim, "id" | "status" | "createdAt" | "updatedAt">;
+  claim: Omit<Claim, "id" | "status" | "createdAt" | "updatedAt" | "botScore">;
   savedAt: string;
   synced: boolean;
 }

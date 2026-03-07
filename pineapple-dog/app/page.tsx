@@ -46,7 +46,7 @@ function NavBar({ isScrolled, onOpenAuth }: { isScrolled: boolean; onOpenAuth: (
   );
 }
 
-function HeroSection({ toggleState, setToggleState, onOpenAuth }: { toggleState: "wager" | "impact", setToggleState: (s: "wager" | "impact") => void, onOpenAuth: () => void }) {
+function HeroSection({ onOpenAuth }: { onOpenAuth: () => void }) {
   return (
     <section className="w-full max-w-7xl mx-auto px-6 md:px-12 min-h-[85vh] flex flex-col justify-center items-center text-center pt-32 pb-12 md:pb-16">
       <h1 className="font-[family-name:var(--font-heading)] text-5xl md:text-7xl lg:text-8xl font-bold tracking-tighter leading-[1.1] mb-8">
@@ -58,92 +58,8 @@ function HeroSection({ toggleState, setToggleState, onOpenAuth }: { toggleState:
         Lock in your goals. If you win, you keep your stake. If you fail, your money automatically funds global disaster relief.
       </p>
 
-      {/* Interactive Toggle Showcase */}
-      <div className="relative w-full max-w-lg mx-auto mb-16 perspective-1000">
-        <div className="flex justify-center gap-2 md:gap-4 mb-8">
-          <button 
-            onClick={() => setToggleState("wager")}
-            className={`px-6 py-3 rounded-full font-[family-name:var(--font-heading)] font-semibold text-sm md:text-base transition-all duration-300 ${
-              toggleState === "wager" 
-                ? "bg-[#6366F1] text-white shadow-[0_0_24px_rgba(99,102,241,0.5)] scale-105" 
-                : "bg-[#1E293B] hover:bg-[#1E293B]/80 text-white/60"
-            }`}
-          >
-            Your Wager
-          </button>
-          <button 
-            onClick={() => setToggleState("impact")}
-            className={`px-6 py-3 rounded-full font-[family-name:var(--font-heading)] font-semibold text-sm md:text-base transition-all duration-300 ${
-              toggleState === "impact" 
-                ? "bg-[#10B981] text-white shadow-[0_0_24px_rgba(16,185,129,0.4)] scale-105" 
-                : "bg-[#1E293B] hover:bg-[#1E293B]/80 text-white/60"
-            }`}
-          >
-            The Impact
-          </button>
-        </div>
-
-        {/* Toggle Cards Container */}
-        <div className="relative h-[280px] w-full preserve-3d mt-4">
-          
-          {/* Left/Wager Card */}
-          <div className={`absolute inset-0 bg-[#1E293B] border border-white/5 shadow-xl rounded-3xl p-8 flex flex-col justify-between transition-all duration-700 ease-out transform ${
-            toggleState === "wager" ? "opacity-100 translate-x-0 scale-100 z-10" : "opacity-0 -translate-x-12 scale-90 pointer-events-none"
-          }`}>
-            <div>
-              <div className="flex justify-between items-start mb-4">
-                <div className="text-left">
-                   <h3 className="font-[family-name:var(--font-heading)] text-2xl font-semibold text-[#6366F1] mb-1">Run 10km by Sunday</h3>
-                   <p className="text-white/50 text-sm font-medium">Staked: 50 SGD</p>
-                </div>
-                <div className="p-3 bg-[#6366F1]/10 rounded-full">
-                  <Activity className="w-6 h-6 text-[#6366F1]" />
-                </div>
-              </div>
-            </div>
-            
-            <div className="w-full text-left">
-              <div className="w-full bg-[#0F172A] rounded-full h-3 mb-3 border border-white/5 overflow-hidden">
-                <div className="bg-gradient-to-r from-[#6366F1] to-[#818CF8] h-full rounded-full relative" style={{ width: '45%' }}>
-                   <div className="absolute top-0 right-0 bottom-0 w-8 bg-white/20 animate-pulse"></div>
-                </div>
-              </div>
-              <div className="flex justify-between text-sm font-medium text-white/60">
-                <span>In Progress</span>
-                <span>4.5km / 10km</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Right/Impact Card */}
-          <div className={`absolute inset-0 bg-[#1E293B] border border-[#10B981]/20 rounded-3xl p-8 shadow-[0_0_40px_rgba(16,185,129,0.05)] flex flex-col justify-between transition-all duration-700 ease-out transform ${
-            toggleState === "impact" ? "opacity-100 translate-x-0 scale-100 z-10" : "opacity-0 translate-x-12 scale-90 pointer-events-none"
-          }`}>
-            <div className="flex justify-between items-start mb-4">
-              <div className="text-left">
-                <h3 className="font-[family-name:var(--font-heading)] text-2xl font-semibold text-[#10B981] mb-1">Relief Deployed</h3>
-                <p className="text-white/50 text-sm font-medium">Earthquake Response, Turkey</p>
-              </div>
-              <div className="p-3 bg-[#10B981]/10 rounded-full">
-                <CheckCircle className="w-6 h-6 text-[#10B981]" />
-              </div>
-            </div>
-            
-            <div className="bg-[#0F172A] rounded-2xl p-6 flex flex-col sm:flex-row items-center border border-white/5 gap-4">
-              <div className="font-[family-name:var(--font-heading)] text-4xl sm:text-5xl font-bold text-[#10B981] drop-shadow-[0_0_12px_rgba(16,185,129,0.3)]">
-                S$50
-              </div>
-              <div className="text-sm font-medium text-white/60 sm:border-l sm:border-white/10 sm:pl-4 sm:ml-2 text-left leading-relaxed">
-                Successfully routed<br/>via smart contract
-              </div>
-            </div>
-          </div>
-
-        </div>
-      </div>
-
       <button onClick={onOpenAuth} className="flex items-center gap-3 bg-[#6366F1] hover:bg-[#4F46E5] text-white px-10 py-5 rounded-full font-[family-name:var(--font-heading)] font-semibold text-lg transition-all hover:shadow-[0_0_32px_rgba(99,102,241,0.5)] hover:-translate-y-1">
-        Create a Wager
+        Get Started
         <ArrowRight className="w-5 h-5" />
       </button>
     </section>
@@ -367,7 +283,6 @@ function Footer() {
 
 export default function Home() {
   const [isScrolled, setIsScrolled] = useState(false);
-  const [toggleState, setToggleState] = useState<"wager" | "impact">("wager");
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   useEffect(() => {
@@ -386,7 +301,7 @@ export default function Home() {
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[120%] max-w-4xl h-[70vh] bg-[radial-gradient(ellipse_at_top,_rgba(99,102,241,0.2)_0%,_transparent_70%)] pointer-events-none z-0"></div>
       
       <div className="relative z-10">
-        <HeroSection toggleState={toggleState} setToggleState={setToggleState} onOpenAuth={() => setIsAuthModalOpen(true)} />
+        <HeroSection onOpenAuth={() => setIsAuthModalOpen(true)} />
         <TrustTicker />
         <HowItWorks />
         <ImpactShowcase />

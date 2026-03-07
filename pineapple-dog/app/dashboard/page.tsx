@@ -12,6 +12,7 @@ import { ProofFeed } from "../../components/dashboard/ProofFeed";
 import { FriendsModal } from "../../components/dashboard/FriendsModal";
 import { ImpactSection } from "../../components/dashboard/ImpactSection";
 import { ChallengeCard } from "../../components/dashboard/ChallengeCard";
+import { WagerChatLayout } from "../../components/dashboard/chat/WagerChatLayout";
 import { RaiseStakesModal } from "../../components/dashboard/RaiseStakesModal";
 import { ProofPost, Wager } from "../../types/dashboard";
 
@@ -22,7 +23,7 @@ import { ProofPost, Wager } from "../../types/dashboard";
 export default function ArenaDashboardLayout() {
   const { user, loading, signOut } = useAuth();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"personal" | "arena" | "impact">("arena");
+  const [activeTab, setActiveTab] = useState<"personal" | "arena" | "impact">("personal");
 
   // Redirect to login if not authenticated or onboarding if not complete
   useEffect(() => {
@@ -44,6 +45,8 @@ export default function ArenaDashboardLayout() {
   const [selectedRaisingWager, setSelectedRaisingWager] = useState<Wager | null>(null);
   const [isProveModalOpen, setIsProveModalOpen] = useState(false);
   const [selectedWagerPrompt, setSelectedWagerPrompt] = useState<Wager | null>(null);
+  const [selectedHasUploadedToday, setSelectedHasUploadedToday] = useState(false);
+  const [selectedInitialFile, setSelectedInitialFile] = useState<File | null>(null);
   const [isFriendsModalOpen, setIsFriendsModalOpen] = useState(false);
 
   // Show loading spinner while checking auth
@@ -67,13 +70,15 @@ export default function ArenaDashboardLayout() {
     setIsModalOpen(true);
   };
 
-  const handleOpenProveModal = (wager: Wager) => {
+  const handleOpenProveModal = (wager: Wager, hasUploaded?: boolean, file?: File) => {
     setSelectedWagerPrompt(wager);
+    setSelectedHasUploadedToday(!!hasUploaded);
+    setSelectedInitialFile(file || null);
     setIsProveModalOpen(true);
   };
 
   return (
-    <main className="min-h-screen bg-slate-900 relative pb-20 font-sans text-slate-100 selection:bg-[#6366F1]/30">
+    <main className={`min-h-screen bg-slate-900 relative font-sans text-slate-100 selection:bg-[#6366F1]/30 ${activeTab === "personal" ? "h-screen overflow-hidden" : "pb-20"}`}>
 
       {/* Background Ambient Glow */}
       <div className="fixed top-[-20%] left-1/2 -translate-x-1/2 w-[120%] h-[60vh] bg-[radial-gradient(ellipse_at_top,_rgba(99,102,241,0.08)_0%,_transparent_70%)] pointer-events-none z-0"></div>
@@ -143,15 +148,11 @@ export default function ArenaDashboardLayout() {
         </div>
       </nav>
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 relative z-10 flex flex-col gap-4">
+      {/* Body Area */}
+      <div className={`mx-auto relative z-10 flex flex-col ${activeTab === "personal" ? "w-full max-w-full h-[calc(100vh-88px)]" : "max-w-5xl px-4 sm:px-6 lg:px-8 pt-6 gap-4"}`}>
 
         {/* Content Heading (Contextual) */}
         <div>
-          {activeTab === "personal" && (
-            <h2 className="text-2xl font-bold font-[family-name:var(--font-heading)] text-white text-center mb-2">
-              Your Active Goals
-            </h2>
-          )}
           {activeTab === "arena" && (
             <h2 className="text-2xl font-bold font-[family-name:var(--font-heading)] text-white text-center">
               The Arena Feed
@@ -160,31 +161,44 @@ export default function ArenaDashboardLayout() {
         </div>
 
         {/* Tab Content Rendering */}
-        <div className="mt-2 min-h-[500px] pb-24">
+        <div className={`${activeTab === "personal" ? "flex-1 min-h-0" : "min-h-[500px] pb-24"}`}>
           {activeTab === "personal" && (
             <motion.div
               key="personal"
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, ease: "easeOut" }}
-              className="w-full"
+              className="w-full h-full"
             >
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 w-full">
-                {myWagers.length > 0 ? (
-                  myWagers.map((wager) => (
-                    <ChallengeCard
-                      key={wager.id}
-                      type="active-goal"
-                      data={wager}
-                      onAction={(data) => handleOpenProveModal(data as Wager)}
-                    />
-                  ))
-                ) : (
-                  <div className="col-span-full py-20 text-center">
-                    <p className="text-slate-500 font-medium">No active challenges found. Start one below!</p>
-                  </div>
-                )}
-              </div>
+              <WagerChatLayout
+                userId={user.uid}
+                onOpenCamera={(wagerId, hasUploaded) => {
+                  const wager = myWagers.find((w) => w.id === wagerId);
+                  if (wager) {
+                    handleOpenProveModal(wager, hasUploaded);
+                  } else {
+                    handleOpenProveModal({
+                      id: wagerId,
+                      title: "Current Showdown",
+                      totalStake: 50,
+                      timeRemaining: "12:00:00",
+                    } as Wager, hasUploaded);
+                  }
+                }}
+                onUploadFile={(wagerId, file) => {
+                  const wager = myWagers.find((w) => w.id === wagerId);
+                  if (wager) {
+                    handleOpenProveModal(wager, false, file);
+                  } else {
+                    handleOpenProveModal({
+                      id: wagerId,
+                      title: "Current Showdown",
+                      totalStake: 50,
+                      timeRemaining: "12:00:00",
+                    } as Wager, false, file);
+                  }
+                }}
+              />
             </motion.div>
           )}
 
@@ -242,16 +256,6 @@ export default function ArenaDashboardLayout() {
           <span className="text-[10px] font-bold uppercase tracking-wider">Arena</span>
         </button>
 
-        <Link 
-          href="/profile"
-          className={`flex-1 flex flex-col items-center gap-1 py-3 px-2 rounded-full transition-all text-slate-400 hover:text-slate-200`}
-        >
-          <div className="p-1 rounded-full text-white/60">
-            <User className="w-5 h-5" />
-          </div>
-          <span className="text-[10px] font-bold uppercase tracking-wider">Profile</span>
-        </Link>
-
         <button
           onClick={() => setActiveTab("impact")}
           className={`flex-1 flex flex-col items-center gap-1 py-3 px-2 rounded-full transition-all ${activeTab === "impact" ? "bg-[#10B981] text-white" : "text-slate-400 hover:text-[#10B981]/80"}`}
@@ -261,6 +265,16 @@ export default function ArenaDashboardLayout() {
           </div>
           <span className="text-[10px] font-bold uppercase tracking-wider">Impact</span>
         </button>
+
+        <Link 
+          href="/profile"
+          className={`flex-1 flex flex-col items-center gap-1 py-3 px-2 rounded-full transition-all text-slate-400 hover:text-slate-200`}
+        >
+          <div className="p-1 rounded-full text-white/60">
+            <User className="w-5 h-5" />
+          </div>
+          <span className="text-[10px] font-bold uppercase tracking-wider">Profile</span>
+        </Link>
       </nav>
 
       <RaiseStakesModal
@@ -279,8 +293,13 @@ export default function ArenaDashboardLayout() {
 
       <ProofSubmissionModal
         isOpen={isProveModalOpen}
-        onClose={() => setIsProveModalOpen(false)}
+        onClose={() => {
+          setIsProveModalOpen(false);
+          setSelectedInitialFile(null);
+        }}
         wager={selectedWagerPrompt}
+        hasUploadedToday={selectedHasUploadedToday}
+        initialFile={selectedInitialFile}
       />
 
       <FriendsModal

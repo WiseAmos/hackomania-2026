@@ -16,7 +16,7 @@ interface Props {
 
 export function ProofFeed({ isLoading, posts, allWagers, onRaiseStakes }: Props) {
   const { user } = useAuth();
-  const [activeFeedTab, setActiveFeedTab] = useState<"friends" | "global">("global");
+  const [activeFeedTab, setActiveFeedTab] = useState<"friends" | "global">("friends");
   const [friends, setFriends] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
@@ -86,7 +86,6 @@ export function ProofFeed({ isLoading, posts, allWagers, onRaiseStakes }: Props)
           globalWagers.map((wager) => (
             <ChallengeCard
               key={wager.id}
-              type="active-goal"
               data={wager}
               onAction={(data) => onRaiseStakes(data as Wager)}
             />
@@ -95,7 +94,6 @@ export function ProofFeed({ isLoading, posts, allWagers, onRaiseStakes }: Props)
           friendsWagers.map((wager) => (
             <ChallengeCard
               key={wager.id}
-              type="active-goal"
               data={wager}
               onAction={(data) => onRaiseStakes(data as Wager)}
             />

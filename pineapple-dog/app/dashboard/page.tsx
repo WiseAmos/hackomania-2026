@@ -124,7 +124,7 @@ export default function ArenaDashboardLayout() {
             <span className="font-bold text-xs sm:text-sm text-[#06B6D4]">
               Friends
             </span>
-          </div>
+          </button>
           <Link href="/wager" className="bg-[#6366F1] hover:bg-[#4F46E5] text-white px-4 sm:px-5 py-2.5 rounded-full font-[family-name:var(--font-heading)] font-bold text-xs sm:text-sm flex items-center gap-2 transition-all shadow-[0_0_24px_rgba(99,102,241,0.4)] hover:-translate-y-0.5 active:scale-95 whitespace-nowrap">
             <Plus className="w-4 h-4" />
             New Showdown

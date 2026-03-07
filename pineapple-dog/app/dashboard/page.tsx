@@ -70,16 +70,7 @@ export default function ArenaDashboardLayout() {
     setIsProveModalOpen(true);
   };
 
-  const currentWager = selectedPost 
-    ? wagers.find(w => w.id === selectedPost.wager.id)
-    : null;
 
-  const participants = currentWager 
-    ? (currentWager.participants 
-        ? currentWager.participants.map(p => ({ user: { id: p.uid, name: p.name, avatar: p.avatar, handle: p.handle } }))
-        : [currentWager.player1, currentWager.player2].filter(Boolean).map(p => ({ user: { id: p.uid, name: p.name, avatar: p.avatar, handle: p.handle } }))
-      )
-    : selectedPost ? [{ user: selectedPost.user }] : [];
 
   return (
     <main className="min-h-screen bg-slate-900 relative pb-20 font-sans text-slate-100 selection:bg-[#6366F1]/30">

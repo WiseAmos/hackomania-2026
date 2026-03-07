@@ -34,13 +34,13 @@ export default function ArenaDashboardLayout() {
     }
   }, [user, loading, router]);
 
-  const { wagers, isLoading: isLoadingWagers } = useActiveShowdowns(user?.uid);
+  const { globalWagers, myWagers, isLoading: isLoadingWagers } = useActiveShowdowns(user?.uid);
   const { feed, isLoading: isLoadingFeed } = useArenaFeed();
   const { claims, isLoading: isLoadingImpact } = useImpactPortfolio(user?.uid);
 
   // Modal states - moved before early returns to follow Rules of Hooks
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedPost, setSelectedPost] = useState<ProofPost | null>(null);
+  const [selectedRaisingWager, setSelectedRaisingWager] = useState<Wager | null>(null);
   const [isProveModalOpen, setIsProveModalOpen] = useState(false);
   const [selectedWagerPrompt, setSelectedWagerPrompt] = useState<Wager | null>(null);
 
@@ -60,8 +60,8 @@ export default function ArenaDashboardLayout() {
     router.push("/");
   };
 
-  const handleOpenModal = (post: ProofPost) => {
-    setSelectedPost(post);
+  const handleOpenRaiseModal = (wager: Wager) => {
+    setSelectedRaisingWager(wager);
     setIsModalOpen(true);
   };
 
@@ -83,7 +83,7 @@ export default function ArenaDashboardLayout() {
 
   return (
     <main className="min-h-screen bg-slate-900 relative pb-20 font-sans text-slate-100 selection:bg-[#6366F1]/30">
-      
+
       {/* Background Ambient Glow */}
       <div className="fixed top-[-20%] left-1/2 -translate-x-1/2 w-[120%] h-[60vh] bg-[radial-gradient(ellipse_at_top,_rgba(99,102,241,0.08)_0%,_transparent_70%)] pointer-events-none z-0"></div>
 
@@ -103,19 +103,19 @@ export default function ArenaDashboardLayout() {
 
           {/* Desktop Navigation Links */}
           <div className="hidden lg:flex items-center gap-1 bg-slate-800/50 p-1 rounded-full border border-white/5">
-            <button 
+            <button
               onClick={() => setActiveTab("personal")}
               className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${activeTab === "personal" ? "bg-[#6366F1] text-white shadow-lg" : "text-slate-400 hover:text-white"}`}
             >
               My Wages
             </button>
-            <button 
+            <button
               onClick={() => setActiveTab("arena")}
               className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${activeTab === "arena" ? "bg-[#6366F1] text-white shadow-lg" : "text-slate-400 hover:text-white"}`}
             >
               Arena
             </button>
-            <button 
+            <button
               onClick={() => setActiveTab("impact")}
               className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${activeTab === "impact" ? "bg-[#10B981] text-white shadow-lg" : "text-slate-400 hover:text-white"}`}
             >
@@ -139,7 +139,7 @@ export default function ArenaDashboardLayout() {
             <Plus className="w-4 h-4" />
             New Showdown
           </Link>
-          <button 
+          <button
             onClick={handleSignOut}
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all text-xs font-bold border border-transparent hover:border-white/10"
           >
@@ -150,17 +150,17 @@ export default function ArenaDashboardLayout() {
       </nav>
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 relative z-10 flex flex-col gap-4">
-        
+
         {/* Content Heading (Contextual) */}
         <div>
           {activeTab === "personal" && (
             <h2 className="text-2xl font-bold font-[family-name:var(--font-heading)] text-white text-center mb-2">
-               Your Active Goals
+              Your Active Goals
             </h2>
           )}
           {activeTab === "arena" && (
             <h2 className="text-2xl font-bold font-[family-name:var(--font-heading)] text-white text-center">
-               The Arena Feed
+              The Arena Feed
             </h2>
           )}
         </div>
@@ -176,9 +176,9 @@ export default function ArenaDashboardLayout() {
               className="w-full"
             >
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 w-full">
-                {wagers.length > 0 ? (
-                  wagers.map((wager) => (
-                    <ChallengeCard 
+                {myWagers.length > 0 ? (
+                  myWagers.map((wager) => (
+                    <ChallengeCard
                       key={wager.id}
                       type="active-goal"
                       data={wager}
@@ -202,11 +202,11 @@ export default function ArenaDashboardLayout() {
               transition={{ duration: 0.4, ease: "easeOut" }}
               className="w-full"
             >
-              <ProofFeed 
-                isLoading={isLoadingFeed} 
-                posts={feed} 
-                allWagers={wagers} 
-                onRaiseStakes={handleOpenModal}
+              <ProofFeed
+                isLoading={isLoadingFeed}
+                posts={feed}
+                allWagers={globalWagers}
+                onRaiseStakes={handleOpenRaiseModal}
               />
             </motion.div>
           )}
@@ -219,7 +219,7 @@ export default function ArenaDashboardLayout() {
               transition={{ duration: 0.4, ease: "easeOut" }}
               className="w-full"
             >
-               <ImpactSection isLoading={isLoadingImpact} claims={claims} />
+              <ImpactSection isLoading={isLoadingImpact} claims={claims} />
             </motion.div>
           )}
         </div>
@@ -228,7 +228,7 @@ export default function ArenaDashboardLayout() {
 
       {/* Bottom Navigation Tab Bar (Mobile Only) */}
       <nav className="sm:hidden fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-md bg-slate-900/90 backdrop-blur-xl border border-white/10 rounded-full p-2 flex items-center justify-between shadow-2xl z-[60]">
-        <button 
+        <button
           onClick={() => setActiveTab("personal")}
           className={`flex-1 flex flex-col items-center gap-1 py-3 px-2 rounded-full transition-all ${activeTab === "personal" ? "bg-[#6366F1] text-white" : "text-slate-400 hover:text-slate-200"}`}
         >
@@ -238,7 +238,7 @@ export default function ArenaDashboardLayout() {
           <span className="text-[10px] font-bold uppercase tracking-wider">My Wages</span>
         </button>
 
-        <button 
+        <button
           onClick={() => setActiveTab("arena")}
           className={`flex-1 flex flex-col items-center gap-1 py-3 px-2 rounded-full transition-all ${activeTab === "arena" ? "bg-[#6366F1] text-white" : "text-slate-400 hover:text-slate-200"}`}
         >
@@ -258,7 +258,7 @@ export default function ArenaDashboardLayout() {
           <span className="text-[10px] font-bold uppercase tracking-wider">Profile</span>
         </Link>
 
-        <button 
+        <button
           onClick={() => setActiveTab("impact")}
           className={`flex-1 flex flex-col items-center gap-1 py-3 px-2 rounded-full transition-all ${activeTab === "impact" ? "bg-[#10B981] text-white" : "text-slate-400 hover:text-[#10B981]/80"}`}
         >
@@ -269,15 +269,21 @@ export default function ArenaDashboardLayout() {
         </button>
       </nav>
 
-      {/* Full-Screen Overlay Modal */}
-      <RaiseStakesModal 
+      <RaiseStakesModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        wagerTitle={selectedPost?.wager.title || ""}
-        participants={participants.map(p => p.user)}
+        wagerTitle={selectedRaisingWager?.title || ""}
+        participants={selectedRaisingWager ? (
+          selectedRaisingWager.participants || [selectedRaisingWager.player1, selectedRaisingWager.player2]
+        ).filter(Boolean).map(p => ({
+          id: p.uid,
+          name: p.name,
+          avatar: p.avatar,
+          handle: p.handle,
+        })) : []}
       />
 
-      <ProofSubmissionModal 
+      <ProofSubmissionModal
         isOpen={isProveModalOpen}
         onClose={() => setIsProveModalOpen(false)}
         wager={selectedWagerPrompt}

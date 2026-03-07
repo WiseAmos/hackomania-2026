@@ -13,33 +13,45 @@ function formatTimeRemaining(deadline: string): string {
 }
 
 export function useActiveShowdowns(userId?: string) {
-  const [wagers, setWagers] = useState<Wager[]>([]);
+  const [globalWagers, setGlobalWagers] = useState<Wager[]>([]);
+  const [myWagers, setMyWagers] = useState<Wager[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const url = userId ? `/api/wagers?userId=${userId}` : "/api/wagers";
-    fetch(url)
-      .then((res) => res.json())
-      .then((data: Wager[]) => {
-        const enriched = (Array.isArray(data) ? data : []).map((w) => ({
-          ...w,
-          timeRemaining: formatTimeRemaining(w.deadline),
-          // Build participants array for ShowdownCarousel compat
-          participants: [
-            { ...w.player1, user: { id: w.player1?.uid || "", name: w.player1?.name || "", avatar: w.player1?.avatar || "?", handle: w.player1?.handle || "" } },
-            { ...w.player2, user: { id: w.player2?.uid || "", name: w.player2?.name || "", avatar: w.player2?.avatar || "?", handle: w.player2?.handle || "" } },
-          ],
-        }));
-        setWagers(enriched);
+    setIsLoading(true);
+
+    const enrichWagers = (data: any[]): Wager[] => {
+      return (Array.isArray(data) ? data : []).map((w) => ({
+        ...w,
+        timeRemaining: formatTimeRemaining(w.deadline),
+        participants: [
+          { ...w.player1, user: { id: w.player1?.uid || "", name: w.player1?.name || "", avatar: w.player1?.avatar || "?", handle: w.player1?.handle || "" } },
+          { ...w.player2, user: { id: w.player2?.uid || "", name: w.player2?.name || "", avatar: w.player2?.avatar || "?", handle: w.player2?.handle || "" } },
+        ],
+      }));
+    };
+
+    const fetches = [fetch("/api/wagers").then(r => r.json())];
+    if (userId) fetches.push(fetch(`/api/wagers?userId=${userId}`).then(r => r.json()));
+
+    Promise.all(fetches)
+      .then((results) => {
+        setGlobalWagers(enrichWagers(results[0]));
+        if (userId && results[1]) {
+          setMyWagers(enrichWagers(results[1]));
+        } else {
+          setMyWagers([]);
+        }
       })
       .catch((err) => {
         console.error("Failed to fetch wagers:", err);
-        setWagers([]);
+        setGlobalWagers([]);
+        setMyWagers([]);
       })
       .finally(() => setIsLoading(false));
   }, [userId]);
 
-  return { wagers, isLoading };
+  return { globalWagers, myWagers, isLoading };
 }
 
 export function useArenaFeed() {

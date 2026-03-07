@@ -9,6 +9,30 @@
   background-color: #0F172A;
   color: #FFFFFF;
   color-scheme: dark;
+
+    /* color scheme */
+  --primaryLight: #E0F2F1;
+  --primary: #10B981;
+  --primaryDark: #059669;
+
+  --secondary: #F59E0B;
+  --secondaryDark: #B45309;
+
+  --title: #000000;
+  --text: #111111;
+  --muted: #6B7280;
+
+  --background: #FFF;
+  --backgroundLight: #F8F8F8;
+
+  --yellow: #FBFBFB;
+
+  --highlightLight: #E5F6FF;
+  --highlight: #2ABDF7;
+  --highlightDark: #001B73;
+
+  --boxShadow: rgba(0,0,0,0.1);
+
 }
 
 html {
@@ -46,4 +70,27 @@ body {
 
 .preserve-3d {
   transform-style: preserve-3d;
+}
+
+
+
+.button-solid:disabled {
+  background-color: var(--muted);
+  color: var(--backgroundLight);
+  pointer-events: none;
+  opacity: .5;
+}
+.button-solid {
+  background-color: var(--primaryDark);
+  color: var(--background);
+  padding: .75em 2em;
+  border-radius: 1em;
+  cursor: pointer;
+  overflow: hidden;
+  transition: transform 0.2s ease, color 0.2s ease, background-color 0.2s ease, opacity 0.3s ease;;
+  font-size: var(--text-base);
+}
+.button-solid:hover {
+  color: var(--background);
+  background-color: var(--primary);
 }

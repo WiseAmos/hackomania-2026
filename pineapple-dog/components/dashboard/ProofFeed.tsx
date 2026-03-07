@@ -10,11 +10,11 @@ interface Props {
   isLoading: boolean;
   posts: ProofPost[];
   allWagers: Wager[];
-  onRaiseStakes: (post: ProofPost) => void;
+  onRaiseStakes: (wager: Wager) => void;
 }
 
 export function ProofFeed({ isLoading, posts, allWagers, onRaiseStakes }: Props) {
-  const [activeFeedTab, setActiveFeedTab] = useState<"following" | "trending" | "global">("following");
+  const [activeFeedTab, setActiveFeedTab] = useState<"following" | "trending" | "global">("global");
 
   if (isLoading) {
     return (
@@ -26,14 +26,14 @@ export function ProofFeed({ isLoading, posts, allWagers, onRaiseStakes }: Props)
   }
 
   // Simple filter logic for demonstration
-  const filteredPosts = activeFeedTab === "following" 
-    ? posts 
+  const filteredPosts = activeFeedTab === "following"
+    ? posts
     : activeFeedTab === "trending"
-    ? [...posts].sort((a, b) => b.verifications - a.verifications)
-    : [...posts].reverse();
+      ? [...posts].sort((a, b) => b.verifications - a.verifications)
+      : [...posts].reverse();
 
   // Zero State for new users
-  if (posts.length === 0) {
+  if (posts.length === 0 && allWagers.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center p-12 text-center bg-slate-800 border border-white/5 rounded-3xl">
         <h3 className="text-xl font-[family-name:var(--font-heading)] font-bold text-white mb-2">It's Quiet Here...</h3>
@@ -47,23 +47,23 @@ export function ProofFeed({ isLoading, posts, allWagers, onRaiseStakes }: Props)
 
   return (
     <div className="w-full max-w-6xl mx-auto">
-      
+
       {/* Toggles */}
       <div className="flex bg-slate-800/50 p-1.5 rounded-full border border-white/5 w-max mx-auto mb-6">
-        <button 
+        <button
           onClick={() => setActiveFeedTab("following")}
           className={`px-4 py-1.5 rounded-full text-sm font-bold transition-all flex items-center gap-2 ${activeFeedTab === "following" ? "bg-slate-700 text-white shadow" : "text-slate-400 hover:text-white"}`}
         >
           Following
           <span className="text-[10px] bg-white/10 px-1.5 py-0.5 rounded-full">{posts.length}</span>
         </button>
-        <button 
+        <button
           onClick={() => setActiveFeedTab("trending")}
           className={`px-4 py-1.5 rounded-full text-sm font-bold transition-all flex items-center gap-2 ${activeFeedTab === "trending" ? "bg-slate-700 text-white shadow" : "text-slate-400 hover:text-white"}`}
         >
           Trending
         </button>
-        <button 
+        <button
           onClick={() => setActiveFeedTab("global")}
           className={`px-4 py-1.5 rounded-full text-sm font-bold transition-all flex items-center gap-2 ${activeFeedTab === "global" ? "bg-slate-700 text-white shadow" : "text-slate-400 hover:text-white"}`}
         >
@@ -73,14 +73,29 @@ export function ProofFeed({ isLoading, posts, allWagers, onRaiseStakes }: Props)
 
       {/* Posts Grid Container */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6 px-3 md:px-0">
-        {filteredPosts.map((post) => (
-          <ChallengeCard 
-            key={post.id} 
-            type="post" 
-            data={post} 
-            onAction={(data) => onRaiseStakes(data as ProofPost)} 
-          />
-        ))}
+        {activeFeedTab === "global" ? (
+          allWagers.map((wager) => (
+            <ChallengeCard
+              key={wager.id}
+              type="active-goal"
+              data={wager}
+              onAction={(data) => onRaiseStakes(data as Wager)}
+            />
+          ))
+        ) : (
+          filteredPosts.map((post) => (
+            <ChallengeCard
+              key={post.id}
+              type="post"
+              data={post}
+              onAction={(data) => {
+                const p = data as ProofPost;
+                const w = allWagers.find((tw) => tw.id === p.wager.id);
+                if (w) onRaiseStakes(w);
+              }}
+            />
+          ))
+        )}
       </div>
     </div>
   );

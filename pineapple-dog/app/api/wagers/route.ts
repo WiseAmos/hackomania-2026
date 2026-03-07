@@ -8,29 +8,29 @@ import { adminDb } from "../../../lib/firebaseAdmin";
 export async function GET(req: NextRequest) {
     try {
         const userId = req.nextUrl.searchParams.get("userId");
-        if (!userId) {
-            // Unauthenticated or not providing userId: return nothing.
-            // Wagers should only be visible to involved users.
-            return NextResponse.json([]);
-        }
-
         const wagersRef = adminDb.ref("wagers");
-
-        // Find where user is player1
-        const snap1 = await wagersRef.orderByChild("player1/uid").equalTo(userId).once("value");
         const data: Record<string, unknown>[] = [];
-        snap1.forEach((child) => {
-            data.push({ id: child.key, ...child.val() });
-        });
 
-        // Find where user is player2
-        const snap2 = await wagersRef.orderByChild("player2/uid").equalTo(userId).once("value");
-        snap2.forEach((child) => {
-            // Avoid duplicates if a user somehow played themselves
-            if (!data.find((w: Record<string, unknown>) => w.id === child.key)) {
+        if (!userId) {
+            // Global Arena: return all wagers
+            const snap = await wagersRef.once("value");
+            snap.forEach((child) => {
                 data.push({ id: child.key, ...child.val() });
-            }
-        });
+            });
+        } else {
+            // My Wagers: return where user is player1 or player2
+            const snap1 = await wagersRef.orderByChild("player1/uid").equalTo(userId).once("value");
+            snap1.forEach((child) => {
+                data.push({ id: child.key, ...child.val() });
+            });
+
+            const snap2 = await wagersRef.orderByChild("player2/uid").equalTo(userId).once("value");
+            snap2.forEach((child) => {
+                if (!data.find((w: any) => w.id === child.key)) {
+                    data.push({ id: child.key, ...child.val() });
+                }
+            });
+        }
 
         // Sort by createdAt descending
         data.sort((a, b) => {

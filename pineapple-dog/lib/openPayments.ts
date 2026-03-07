@@ -1,7 +1,7 @@
 import { createAuthenticatedClient } from "@interledger/open-payments";
 import crypto from "crypto";
 
-export const WALLET_ADDRESS = "https://ilp.interledger-test.dev/james";
+export const WALLET_ADDRESS = "https://ilp.interledger-test.dev/pranav";
 
 const KEY_ID = "a25121d8-b1ef-4a81-8f75-2ee25d62dc64";
 

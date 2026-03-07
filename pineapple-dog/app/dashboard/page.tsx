@@ -36,7 +36,7 @@ export default function ArenaDashboardLayout() {
 
   // Modal states - moved before early returns to follow Rules of Hooks
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedPost, setSelectedPost] = useState<ProofPost | null>(null);
+  const [selectedRaisingWager, setSelectedRaisingWager] = useState<Wager | null>(null);
   const [isProveModalOpen, setIsProveModalOpen] = useState(false);
   const [selectedWagerPrompt, setSelectedWagerPrompt] = useState<Wager | null>(null);
 
@@ -56,8 +56,8 @@ export default function ArenaDashboardLayout() {
     router.push("/");
   };
 
-  const handleOpenModal = (post: ProofPost) => {
-    setSelectedPost(post);
+  const handleOpenRaiseModal = (wager: Wager) => {
+    setSelectedRaisingWager(wager);
     setIsModalOpen(true);
   };
 
@@ -65,17 +65,6 @@ export default function ArenaDashboardLayout() {
     setSelectedWagerPrompt(wager);
     setIsProveModalOpen(true);
   };
-
-  const currentWager = selectedPost
-    ? globalWagers.find(w => w.id === selectedPost.wager.id)
-    : null;
-
-  const participants = currentWager
-    ? (currentWager.participants || [
-      currentWager.player1,
-      currentWager.player2
-    ].filter(Boolean).map(p => ({ user: { id: p.uid, name: p.name, avatar: p.avatar, handle: p.handle } })))
-    : selectedPost ? [{ user: selectedPost.user }] : [];
 
   return (
     <main className="min-h-screen bg-slate-900 relative pb-20 font-sans text-slate-100 selection:bg-[#6366F1]/30">
@@ -198,7 +187,7 @@ export default function ArenaDashboardLayout() {
                 isLoading={isLoadingFeed}
                 posts={feed}
                 allWagers={globalWagers}
-                onRaiseStakes={handleOpenModal}
+                onRaiseStakes={handleOpenRaiseModal}
               />
             </motion.div>
           )}
@@ -254,11 +243,15 @@ export default function ArenaDashboardLayout() {
       <RaiseStakesModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        wagerTitle={selectedPost?.wager.title || ""}
-        participants={participants.map(p => {
-          if ('user' in p) return p.user;
-          return { id: p.uid, name: p.name, avatar: p.avatar, handle: p.handle };
-        })}
+        wagerTitle={selectedRaisingWager?.title || ""}
+        participants={selectedRaisingWager ? (
+          selectedRaisingWager.participants || [selectedRaisingWager.player1, selectedRaisingWager.player2]
+        ).filter(Boolean).map(p => ({
+          id: p.uid,
+          name: p.name,
+          avatar: p.avatar,
+          handle: p.handle,
+        })) : []}
       />
 
       <ProofSubmissionModal

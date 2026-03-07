@@ -227,28 +227,50 @@ export default function ClaimsClientPage() {
                 <h2 className="text-xl font-bold text-[#6366F1] mb-2">Category Verification Details</h2>
                 {impact === "property" && (
                   <div className="flex flex-col gap-4">
-                    <p className="text-sm text-slate-400 leading-relaxed mb-2">Please provide your home address so we can cross-reference it with the disaster damage zone.</p>
+                    <p className="text-sm text-slate-400 leading-relaxed mb-2">We need cross-reference records to evaluate property and asset damages against disaster logs.</p>
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-bold text-slate-400 pl-1 uppercase tracking-wider">Home Address</label>
+                      <label className="text-xs font-bold text-slate-400 pl-1 uppercase tracking-wider">Home / Property Address</label>
                       <input type="text" value={formData.homeAddress} onChange={e => updateForm("homeAddress", e.target.value)} placeholder="Full property location" className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#6366F1] transition-colors" />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-bold text-slate-400 pl-1 uppercase tracking-wider">Property Deed / Title No. (Optional)</label>
+                      <input type="text" placeholder="e.g. TITLE-194092" className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#6366F1] transition-colors" />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-bold text-slate-400 pl-1 uppercase tracking-wider">Vehicle License Plate (If Claiming Car Damage)</label>
+                      <input type="text" placeholder="e.g. SGM1234A" className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#6366F1] transition-colors" />
                     </div>
                   </div>
                 )}
                 {impact === "presence" && (
-                  <div className="flex flex-col gap-4 items-center justify-center h-40 bg-black/20 border border-white/5 rounded-2xl p-6 text-center">
-                    <Locate className="w-10 h-10 text-[#6366F1]/50" />
-                    <div>
-                      <h3 className="font-bold text-slate-200 mb-1">GPS Data Authorized</h3>
-                      <p className="text-sm text-slate-400">Your secure device location logs will be attached to verify your presence at the event.</p>
+                  <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-4 items-center justify-center h-40 bg-black/20 border border-white/5 rounded-2xl p-6 text-center">
+                      <Locate className="w-10 h-10 text-[#6366F1]/50" />
+                      <div>
+                        <h3 className="font-bold text-slate-200 mb-1">GPS Data Authorized</h3>
+                        <p className="text-sm text-slate-400">Your secure device location logs will be attached to verify your presence at the event.</p>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-bold text-slate-400 pl-1 uppercase tracking-wider">Mobile Telecom Provider</label>
+                      <input type="text" placeholder="e.g. Singtel, Starhub (for regional tower verification)" className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#6366F1] transition-colors" />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-bold text-slate-400 pl-1 uppercase tracking-wider">Hospital / Medical Bill Ref (Optional)</label>
+                      <input type="text" placeholder="e.g. SGH-2940-Bill" className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#6366F1] transition-colors" />
                     </div>
                   </div>
                 )}
                 {impact === "livelihood" && (
                   <div className="flex flex-col gap-4">
-                    <p className="text-sm text-slate-400 leading-relaxed mb-2">Please provide your business registry details so we can verify the operational disruption.</p>
+                    <p className="text-sm text-slate-400 leading-relaxed mb-2">Provide your business and commercial registry IDs to verify operational interruptions.</p>
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-bold text-slate-400 pl-1 uppercase tracking-wider">Business UEN (Registry ID)</label>
+                      <label className="text-xs font-bold text-slate-400 pl-1 uppercase tracking-wider">Business UEN / Tax ID</label>
                       <input type="text" value={formData.businessUen} onChange={e => updateForm("businessUen", e.target.value)} placeholder="e.g. 201827464C" className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#6366F1] transition-colors" />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-bold text-slate-400 pl-1 uppercase tracking-wider">Registered Company Name</label>
+                      <input type="text" placeholder="e.g. ABC Holdings Pte Ltd" className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#6366F1] transition-colors" />
                     </div>
                     <div className="flex flex-col gap-1.5">
                       <label className="text-xs font-bold text-slate-400 pl-1 uppercase tracking-wider">Business Sector</label>

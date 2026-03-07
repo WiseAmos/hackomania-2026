@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { User, onAuthStateChanged, signOut as fbSignOut } from "firebase/auth";
-import { ref, get } from "firebase/database";
+import { ref, onValue } from "firebase/database";
 import { auth, db } from "./firebase";
 
 interface AuthUser {
@@ -12,6 +12,16 @@ interface AuthUser {
     avatar: string;
     handle: string;
     walletAddress?: string;
+    firstName?: string;
+    lastName?: string;
+    identification?: string;
+    homeAddress?: string;
+    householdIncome?: string;
+    dob?: string;
+    interledgerLink?: string;
+    kycVerified?: boolean;
+    identityDocUrl?: string;
+    onboardingComplete?: boolean;
 }
 
 interface AuthContextType {
@@ -34,13 +44,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const unsub = onAuthStateChanged(auth, async (fbUser) => {
+        let profileUnsub: (() => void) | null = null;
+
+        const authUnsub = onAuthStateChanged(auth, (fbUser) => {
             if (fbUser) {
                 setFirebaseUser(fbUser);
 
-                // Try to fetch full profile from RTDB
-                try {
-                    const snap = await get(ref(db, `users/${fbUser.uid}`));
+                // Setup real-time listener for profile
+                const userRef = ref(db, `users/${fbUser.uid}`);
+                profileUnsub = onValue(userRef, (snap: any) => {
                     if (snap.exists()) {
                         setUser({ uid: fbUser.uid, ...snap.val() });
                     } else {
@@ -53,23 +65,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                             handle: `@${(fbUser.displayName || "user").toLowerCase().replace(/\s+/g, "")}`,
                         });
                     }
-                } catch {
-                    setUser({
-                        uid: fbUser.uid,
-                        name: fbUser.displayName || "Anonymous",
-                        email: fbUser.email || "",
-                        avatar: fbUser.photoURL || fbUser.displayName?.charAt(0).toUpperCase() || "?",
-                        handle: `@${(fbUser.displayName || "user").toLowerCase().replace(/\s+/g, "")}`,
-                    });
-                }
+                    setLoading(false);
+                }, (err: Error) => {
+                    console.error("Profile listener error:", err);
+                    setLoading(false);
+                });
             } else {
                 setFirebaseUser(null);
                 setUser(null);
+                if (profileUnsub) {
+                    profileUnsub();
+                    profileUnsub = null;
+                }
+                setLoading(false);
             }
-            setLoading(false);
         });
 
-        return unsub;
+        return () => {
+            authUnsub();
+            if (profileUnsub) profileUnsub();
+        };
     }, []);
 
     const signOut = async () => {

@@ -38,6 +38,20 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
         }
 
+        // Check if user is KYC verified
+        const userRef = adminDb.ref(`users/${userId}`);
+        const userSnap = await userRef.once("value");
+        if (!userSnap.exists()) {
+            return NextResponse.json({ error: "User not found" }, { status: 404 });
+        }
+        
+        const userData = userSnap.val();
+        if (!userData.kycVerified) {
+            return NextResponse.json({ 
+                error: "KYC verification required to upload claims. Please complete your profile and upload identity documents." 
+            }, { status: 403 });
+        }
+
         const claimData = {
             userId,
             amount: Number(amount),

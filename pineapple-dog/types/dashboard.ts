@@ -4,6 +4,16 @@ export interface User {
   avatar: string;
   handle: string;
   walletAddress?: string;
+  firstName?: string;
+  lastName?: string;
+  identification?: string;
+  homeAddress?: string;
+  householdIncome?: string;
+  dob?: string;
+  interledgerLink?: string;
+  kycVerified?: boolean;
+  identityDocUrl?: string;
+  onboardingComplete?: boolean;
 }
 
 export interface Participant {

@@ -18,6 +18,8 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [authMethod, setAuthMethod] = useState<"google" | "email" | null>(null);
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isSignUp, setIsSignUp] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
@@ -31,6 +33,8 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
         avatar: photoUrl || name.charAt(0).toUpperCase(),
         handle: `@${name.toLowerCase().replace(/\s+/g, "")}`,
         walletAddress: "",
+        onboardingComplete: false,
+        kycVerified: false,
         createdAt: new Date().toISOString(),
       });
     }
@@ -62,12 +66,11 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
     setError(null);
 
     try {
-      // Try sign in first, if fails, create account
-      try {
-        const result = await signInWithEmailAndPassword(auth, email, "default_pass_123");
+      if (isSignUp) {
+        const result = await createUserWithEmailAndPassword(auth, email, password);
         await writeUserProfile(result.user.uid, email.split("@")[0], email);
-      } catch {
-        const result = await createUserWithEmailAndPassword(auth, email, "default_pass_123");
+      } else {
+        const result = await signInWithEmailAndPassword(auth, email, password);
         await writeUserProfile(result.user.uid, email.split("@")[0], email);
       }
       onClose();
@@ -176,9 +179,20 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
                   <div className="relative">
                     <input
                       type="email"
-                      placeholder="Enter with Email"
+                      placeholder="Email Address"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
+                      disabled={isLoading}
+                      required
+                      className="w-full bg-[#0F172A]/50 border border-white/10 rounded-xl px-5 h-14 text-white placeholder-white/40 focus:outline-none focus:border-[#6366F1]/50 focus:ring-1 focus:ring-[#6366F1]/50 focus:bg-[#0F172A] transition-all disabled:opacity-50 font-medium"
+                    />
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="password"
+                      placeholder="Password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
                       disabled={isLoading}
                       required
                       className="w-full bg-[#0F172A]/50 border border-white/10 rounded-xl px-5 h-14 text-white placeholder-white/40 focus:outline-none focus:border-[#6366F1]/50 focus:ring-1 focus:ring-[#6366F1]/50 focus:bg-[#0F172A] transition-all disabled:opacity-50 font-medium"
@@ -198,11 +212,23 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
                       </motion.div>
                     ) : (
                       <>
-                        Continue with Email
+                        {isSignUp ? "Create Account" : "Sign In"}
                         <ArrowRight className="w-4 h-4 opacity-50" />
                       </>
                     )}
                   </button>
+                  <div className="text-center pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsSignUp(!isSignUp);
+                        setError(null);
+                      }}
+                      className="text-white/40 hover:text-[#6366F1] transition-colors text-xs font-bold uppercase tracking-wider"
+                    >
+                      {isSignUp ? "Already have an account? Sign In" : "New here? Create an Account"}
+                    </button>
+                  </div>
                 </form>
               </div>
 

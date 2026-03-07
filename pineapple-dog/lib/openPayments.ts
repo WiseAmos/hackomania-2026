@@ -6,7 +6,7 @@ export const WALLET_ADDRESS = "https://ilp.interledger-test.dev/james";
 const KEY_ID = "1bb7ccfe-dc0b-4696-8c1e-a4fabcb7f9e7";
 
 const RAW_PRIVATE_KEY = `-----BEGIN PRIVATE KEY-----
-MC4CAQAwBQYDK2VwBCIEIPG5+Z80zh0FMZPrfwZabNxz/Mwy+Cb9KMBz2BWWpjAz
+MC4CAQAwBQYDK2VwBCIEINvds4N1QhzkdAcHrBZhKpkQAHX0ltTsxn3qYTxVBtXz
 -----END PRIVATE KEY-----`;
 
 export async function getOpenPaymentsClient() {

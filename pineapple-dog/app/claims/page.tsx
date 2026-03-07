@@ -5,9 +5,10 @@ import Link from "next/link"
 import { useAuth } from "../../lib/AuthContext"
 import { db } from "../../lib/firebase"
 import { ref, onValue, runTransaction } from "firebase/database"
-import { ClaimManifest, UnifiedResponse } from "../../lib/pdl-engine"
+import { ClaimManifest, UnifiedResponse } from "../../lib/verification"
 import { calculateVotingPower } from "../../src/utils/voting"
 import { PlatformStats, Wager } from "../../types/dashboard"
+import ClaimsClientPage from "./claimsPage"
 
 export default function ClaimsDashboard() {
   const { user } = useAuth()
@@ -230,7 +231,7 @@ export default function ClaimsDashboard() {
                         }}
                         disabled={votingState[manifest.claim_id]}
                         className={`flex items-center justify-center w-10 h-10 rounded-full transition-all ${votingState[manifest.claim_id] ? 'opacity-50 cursor-not-allowed bg-slate-700' :
-                            hasVoted ? 'bg-[#6366F1] text-white' : 'bg-slate-700/50 hover:bg-slate-700 text-slate-400 hover:text-white'
+                          hasVoted ? 'bg-[#6366F1] text-white' : 'bg-slate-700/50 hover:bg-slate-700 text-slate-400 hover:text-white'
                           }`}
                       >
                         {votingState[manifest.claim_id] ? (

@@ -1,7 +1,13 @@
 export interface ClaimManifest {
   claim_id: string;
   submission_date: string;
-  disaster_event_id: string;
+  disaster_info: {
+    name: string;
+    date: string;
+    time?: string;
+    details: string;
+    location?: string;
+  };
   title: string;
   description: string;
   amount_requested: number;
@@ -33,6 +39,7 @@ export interface VerificationResults {
     payout_percentage: number;
     status: string;
   };
+  analysis_explanation: string;
 }
 
 export interface UnifiedResponse {
@@ -86,11 +93,11 @@ export class PDLEngine {
   private async saveTokenToDb(response: UnifiedResponse) {
     const claimId = response.claim_manifest.claim_id;
     const claimRef = adminDb.ref(`claims/${claimId}`);
-    await claimRef.set({
+    await claimRef.update({
       ...response,
       updated_at: new Date().toISOString()
     });
-    console.log(`[PDL-Engine] Claim ${claimId} persisted to database.`);
+    console.log(`[PDL-Engine] Claim ${claimId} verified and updated in database.`);
   }
 
   private basicScoreFallback(): VerificationResults {
@@ -101,7 +108,8 @@ export class PDLEngine {
       disbursement: {
         payout_percentage: 0,
         status: "PENDING_HUMAN_REVIEW"
-      }
+      },
+      analysis_explanation: "AI assessment failed. Falling back to manual review."
     };
   }
 
@@ -111,7 +119,8 @@ export class PDLEngine {
       throw new Error("[PDL-Engine] AI Assessment requires a valid GEMINI_API_KEY. Mocking is disabled per user request.");
     }
 
-    const model = this.genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = this.genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+    
     const prompt = `
 Role: You are the PDL-Engine, a high-precision risk-assessment auditor for disaster relief claims. 
 
@@ -122,23 +131,19 @@ SCORING GUIDELINES (Total Max 100):
 You must evaluate each section on a scale from 0 to its maximum value based on the evidence provided. Do NOT use binary (all-or-nothing) scores unless the evidence is absolute.
 
 1. Disaster Confirmation (Max 40):
-   - Score based on how well the disaster_event_id and description match regional events. 
-   - A verified event ID (e.g. SG-FLOOD prefix) starts at 30+ points. 
+   - Score based on how well the disaster_info (name, date, time, details, location) matches known historical or real-time event patterns.
+   - High scores for specific, consistent details that align with the provided disaster type.
    - Graded based on timing and description accuracy.
 
 2. Identity & Account Standing (Max 20):
    - Score based on the completeness of the claim metadata (claim_id, title, description, submission_date).
    - Higher scores for professional, consistent data.
 
-3. Location/Sector Match (Max 30):
+3. Location/Sector Match (Max 40):
    - Graded based on the proximity of user's signals (home_address, gps_location_logs, or business_uen) to the disaster zone.
-   - 30 pts: Direct hit / exact location.
-   - 15-25 pts: Near impact zone / same city district.
-   - 5-14 pts: Regional proximity but not directly in the damage zone.
-
-4. Evidence Plausibility (Max 10):
-   - Graded based on URLs/data provided in category_details (satellite_damage_img, geotagged_media, income_loss_proof).
-   - Score for the data's relevance to the disaster type.
+   - 40 pts: Direct hit / exact location.
+   - 20-35 pts: Near impact zone / same city district.
+   - 5-19 pts: Regional proximity but not directly in the damage zone.
 
 ---
 TRIAGE TIERS:
@@ -154,7 +159,8 @@ OUTPUT FORMAT (JSON ONLY):
   "disbursement": {
     "payout_percentage": number,
     "status": "DISBURSED" | "PARTIAL_DISBURSED" | "PENDING_HUMAN_REVIEW"
-  }
+  },
+  "analysis_explanation": "A detailed 2-3 sentence explanation of why this score was given, citing specific evidence from the manifest."
 }
 
 INPUT DATA:

@@ -1,5 +1,6 @@
 export interface User {
   id: string;
+  uid?: string; // added to match API output
   name: string;
   avatar: string;
   handle: string;

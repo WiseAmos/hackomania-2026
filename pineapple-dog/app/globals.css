@@ -23,7 +23,7 @@
   --muted: #6B7280;
 
   --background: #FFF;
-  --backgroundLight: #F8F8F8;
+  --backgroundLight: #E8E8E8;
 
   --yellow: #FBFBFB;
 
@@ -71,8 +71,9 @@ body {
 .preserve-3d {
   transform-style: preserve-3d;
 }
-
-
+div {
+  font-family: var(--font-heading);
+}
 
 .button-solid:disabled {
   background-color: var(--muted);

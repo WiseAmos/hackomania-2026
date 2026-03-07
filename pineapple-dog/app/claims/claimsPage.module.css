@@ -1,0 +1,70 @@
+.modal {
+  display: flex;  
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  
+}
+
+.claimsPage {
+  background-color: var(--background);
+  color: var(--text);
+  padding: 2rem;
+  min-width: 500px;
+}
+
+.title {
+  font-size: var(--text-2xl);
+}
+
+.listItem {
+  padding: .5rem;
+  background-color: var(--primaryLight);
+  margin-bottom: .5rem;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+.listItem:hover {
+  background-color: var(--primary);
+}
+.listItem.active {
+  background-color: var(--primary);
+}
+
+.impactItem {
+  display: flex;
+  gap: 5px;
+}
+
+.evidence {
+  height: 5rem;
+  display: flex;
+  align-items: center;
+  justify-items: center;
+  text-align: center;
+  padding: 1rem;
+  background-color: var(--backgroundLight);
+}
+.scores {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+}
+.score {
+  display: flex;  
+  align-items: center;
+  flex-direction: column;
+}
+.scoreBox {
+  width: 5rem;
+  height: 5rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-items: center;
+  text-align: center;
+  border: 5px solid #8CD1C6;
+}
+
+.scoreText {
+  width: 100%;
+}

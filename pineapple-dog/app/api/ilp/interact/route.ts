@@ -39,15 +39,28 @@ export async function POST(req: NextRequest) {
       { interact_ref },
     );
 
-    // Extract the final access token and updated continuation info
-    const continuationUri = (finalizedGrant as any).continue?.uri;
+    // Extract tokens from the finalized grant response.
+    // Open Payments returns TWO different tokens:
+    //   - access_token.value      → the PAYMENT token (use for quote, outgoingPayment)
+    //   - continue.access_token.value → the CONTINUATION token (use for further grant.continue() calls)
+    const paymentAccessToken = (finalizedGrant as any).access_token?.value;
     const continuationToken = (finalizedGrant as any).continue?.access_token?.value;
+    const continuationUri = (finalizedGrant as any).continue?.uri;
 
-    // Update the stored grant with the finalized info
+    console.log(`[ilp/interact] Grant ${grantId} — payment token: ${paymentAccessToken ? "✓" : "✗"}, continue token: ${continuationToken ? "✓" : "✗"}`);
+
+    if (!paymentAccessToken) {
+      console.warn(`[ilp/interact] WARNING: No payment access token returned for grant ${grantId}. The wallet may not have issued one.`);
+    }
+
+    // Update the stored grant with both tokens
     const updates = {
       interactRef: interact_ref,
       hash: hash || "",
       status: "authorized" as const,
+      // The token used for actual payments (quote.create, outgoingPayment.create)
+      accessToken: paymentAccessToken || "",
+      // The token used for future grant.continue() calls
       continueToken: continuationToken || grant.continueToken,
       continueUri: continuationUri || grant.continueUri,
     };
@@ -55,7 +68,7 @@ export async function POST(req: NextRequest) {
     // Persist to Firebase
     await adminDb.ref(`grants/${grantId}`).update(updates);
 
-    console.log(`[ilp/interact] Grant ${grantId} finalized and updated in Firebase`);
+    console.log(`[ilp/interact] Grant ${grantId} finalized and persisted to Firebase`);
 
     return NextResponse.json({ success: true });
   } catch (err) {

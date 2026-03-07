@@ -161,20 +161,29 @@ export async function POST(req: NextRequest) {
         console.log(`>>> [RESOLVE] Incoming payment created: ${incomingPayment.id}`);
 
         // Step 3: Create quote from loser → incoming payment URL (no debitAmount needed)
+        // IMPORTANT: use grant.accessToken (the payment token), NOT grant.continueToken
+        const paymentToken = grant.accessToken;
+        if (!paymentToken) {
+          throw new Error(
+            `Grant ${gid} has no accessToken. The grant was likely authorized before the token-extraction fix. ` +
+            `The user needs to re-authorize their stake to get a fresh payment token.`
+          );
+        }
+        console.log(`>>> [RESOLVE] Using payment token (accessToken) for quote and outgoing payment`);
+
         const quote = await client.quote.create(
-          { url: loserWallet.resourceServer, accessToken: grant.continueToken },
+          { url: loserWallet.resourceServer, accessToken: paymentToken },
           {
             walletAddress: loserWallet.id,
             receiver: incomingPayment.id,   // ← incoming payment URL, NOT wallet address
             method: "ilp",
-            // NOTE: amount is implicit from the incoming payment — do NOT pass debitAmount here
           }
         );
         console.log(`>>> [RESOLVE] Quote created: ${quote.id}. Executing outgoing payment...`);
 
         // Step 4: Execute the outgoing payment
         await client.outgoingPayment.create(
-          { url: loserWallet.resourceServer, accessToken: grant.continueToken },
+          { url: loserWallet.resourceServer, accessToken: paymentToken },
           { walletAddress: loserWallet.id, quoteId: quote.id }
         );
 
@@ -192,10 +201,11 @@ export async function POST(req: NextRequest) {
           id: poolGrantId,
           sourceWagerId: wagerId,
           amount: poolAmount,
+          accessToken: grant.accessToken || "",
           continueToken: grant.continueToken,
           continueUri: grant.continueUri,
           interactRef: grant.interactRef,
-          walletUrl: normalizeWalletUrl(loserP.walletAddress),
+          walletUrl: grant.walletUrl || normalizeWalletUrl(loserP.walletAddress || ""),
           status: "available",
           createdAt: new Date().toISOString()
         });

@@ -3,7 +3,8 @@ import { useCallback, useEffect, useState } from "react"
 import s from "./claimsPage.module.css"
 import { ArrowLeft, BriefcaseBusiness, House, Locate } from 'lucide-react';
 import { useDropzone } from "react-dropzone"
-import Link from "next/link";
+import { useAuth } from "@/lib/AuthContext"
+import Link from "next/link"
 
 export default function ClaimsClientPage(
   {currentDisasters} : 
@@ -84,29 +85,74 @@ export default function ClaimsClientPage(
     maxFiles: 1
   })
 
-  const recordAnalysis = 0.27
-  const gpsAnalysis = 0.27
-  const businessAnalysis = 0.27
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [verificationResult, setVerificationResult] = useState<any>(null);
+  const [showRaw, setShowRaw] = useState(false);
+  const [amount, setAmount] = useState("50");
+  const [description, setDescription] = useState("");
+
+  const recordAnalysis = "Analysis Pending";
+  const businessAnalysis = "Analysis Pending";
+
+  const { user } = useAuth();
+
+  async function handleSubmit() {
+    if (!user) return;
+    setIsSubmitting(true);
+    setStep(4);
+
+    try {
+      const res = await fetch("/api/claims", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user.uid,
+          amount,
+          description,
+          reliefFund: disaster,
+          wagerTitle: "Community Relief Claim",
+          claimantWallet: user.walletAddress || "test.wallet.near",
+          disaster_info: {
+            name: disaster,
+            date: new Date().toISOString().split('T')[0],
+            details: description,
+            location: "Singapore"
+          },
+          selected_category: impact?.toUpperCase(),
+          category_details: {
+            [impact || "other"]: {
+              // Image data excluded per user request to save tokens
+            }
+          }
+        })
+      });
+
+      const data = await res.json();
+      if (data.verification) {
+        setVerificationResult(data.verification.verification_results);
+      }
+    } catch (err) {
+      console.error("Submission failed:", err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
 
   return (
-    <main className="min-h-screen bg-slate-900 relative font-sans text-slate-100 selection:bg-[#6366F1]/30">
-        {/* Background Ambient Glow */}
-        <div className="fixed top-[-20%] left-1/2 -translate-x-1/2 w-[120%] h-[60vh] bg-[radial-gradient(ellipse_at_top,_rgba(99,102,241,0.08)_0%,_transparent_70%)] pointer-events-none z-0" />
-
-        {/* Nav */}
-        <nav className="w-full flex justify-between items-center py-6 px-6 md:px-10 border-b border-white/5 bg-slate-900/80 backdrop-blur-xl sticky top-0 z-50">
-            <Link
-                href="/dashboard"
-                className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
-            >
-                <ArrowLeft className="w-4 h-4" />
-                <span className="text-sm font-medium">Back to Dashboard</span>
-            </Link>
-
-        </nav>
-        <div className={s.modal}>
-          <div className={s.claimsPage}>
-            <h1 className={s.title}>Submit a claim</h1>
+    <>
+      {/* Nav */}
+      <nav className="w-full flex justify-between items-center py-6 px-6 md:px-10 border-b border-white/5 bg-slate-900/80 backdrop-blur-xl sticky top-0 z-50">
+          <Link
+              href="/dashboard"
+              className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
+          >
+              <ArrowLeft className="w-4 h-4" />
+              <span className="text-sm font-medium">Back to Dashboard</span>
+          </Link>
+      </nav>
+      <div className={s.modal}>
+        <div className={s.claimsPage}>
+          <h1 className={s.title}>Submit a claim</h1>
             <div className={s.stepFrame}>
               {step === 0 && 
                 <div className={s.activeDisaster}>
@@ -157,50 +203,155 @@ export default function ClaimsClientPage(
                   )}
                 </div>
               )}
-              {step === 3 && (
-                <div className={s.analyseEvidence}>
-                  <h2 className={s.header}>Score</h2>
-                  <div className={s.scores}>
-                    <div className={s.score}>
-                      <div className={s.scoreHeader}>Records Analysis</div>
-                      <div className={s.scoreBox}>
-                        <div className={s.scoreText}>
-                          {recordAnalysis}
+            </div>
+
+        {step === 4 && (
+          <div className={s.analyseEvidence}>
+            <h2 className={s.header}>{isSubmitting ? "Verifying Claim..." : "Verification Result"}</h2>
+            
+            {isSubmitting ? (
+              <div className={s.loadingContainer}>
+                <div className={s.spinner}></div>
+                <p>Gemini AI is auditing your claim manifest...</p>
+              </div>
+            ) : verificationResult ? (
+              <div className={s.resultsLayout}>
+                {verificationResult.validator_data && (
+                  <>
+                    <h3 style={{ color: verificationResult.validator_data.verification_anchor.disaster_verified ? '#10B981' : '#EF4444', marginBottom: '0.5rem' }}>
+                      {verificationResult.validator_data.verification_anchor.disaster_verified ? '✓ Disaster Verified' : '❌ Disaster Not Found'}
+                    </h3>
+                    <div className={s.scores}>
+                      <div className={s.score}>
+                        <div className={s.scoreHeader}>IoT Sensors<br/>(Weather/Seismic)</div>
+                        <div className={s.scoreBox} style={{ borderColor: verificationResult.validator_data.verification_anchor.data_sources.iot_sensor_match === 'PASS' ? '#10B981' : '#EF4444' }}>
+                          <div className={s.scoreText}>
+                            {verificationResult.validator_data.verification_anchor.data_sources.iot_sensor_match}
+                          </div>
+                        </div>
+                      </div>
+                      <div className={s.score}>
+                        <div className={s.scoreHeader}>News<br/>Reports</div>
+                        <div className={s.scoreBox}>
+                          <div className={s.scoreText}>
+                            {verificationResult.validator_data.verification_anchor.data_sources.news_reports_found}
+                          </div>
+                        </div>
+                      </div>
+                      <div className={s.score}>
+                        <div className={s.scoreHeader}>Oracle<br/>Consensus</div>
+                        <div className={s.scoreBox} style={{ borderColor: verificationResult.validator_data.verification_anchor.data_sources.oracle_consensus >= 50 ? '#10B981' : '#EF4444' }}>
+                          <div className={s.scoreText}>
+                            {verificationResult.validator_data.verification_anchor.data_sources.oracle_consensus}%
+                          </div>
                         </div>
                       </div>
                     </div>
-                    <div className={s.score}>
-                      <div className={s.scoreHeader}>GPS Data</div>
-                      <div className={s.scoreBox}>
-                        <div className={s.scoreText}>
-                          {recordAnalysis}
+                    {/* Legacy UI Verification Boxes */}
+                    {verificationResult.calculated_score > 0 && (
+                      <div className={s.scores}>
+                        <div className={s.score}>
+                          <div className={s.scoreHeader}>Records Analysis</div>
+                          <div className={s.scoreBox}>
+                            <div className={s.scoreText}>
+                              {recordAnalysis}
+                            </div>
+                          </div>
+                        </div>
+                        <div className={s.score}>
+                          <div className={s.scoreHeader}>GPS Data</div>
+                          <div className={s.scoreBox}>
+                            <div className={s.scoreText}>
+                              {recordAnalysis}
+                            </div>
+                          </div>
+                        </div>
+                        <div className={s.score}>
+                          <div className={s.scoreHeader}>Business Registry</div>
+                          <div className={s.scoreBox}>
+                            <div className={s.scoreText}>
+                              {businessAnalysis}
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div className={s.score}>
-                      <div className={s.scoreHeader}>Business Registry</div>
-                      <div className={s.scoreBox}>
-                        <div className={s.scoreText}>
-                          {businessAnalysis}
-                        </div>
-                      </div>
-                    </div>
+                    )}
+                  </>
+                )}
+                <div className={s.scoreCircle}>
+                  <div className={s.scoreVal}>{verificationResult.calculated_score}</div>
+                  <div className={s.scoreLabel}>AI Confidence</div>
+                </div>
+                
+                <div className={s.resultsDetails}>
+                  <div className={s.resultRow}>
+                    <span>Triage Tier:</span>
+                    <span className={s.resultVal}>Tier {verificationResult.triage_tier}</span>
+                  </div>
+                  <div className={s.resultRow}>
+                    <span>Status:</span>
+                    <span className={s.resultVal}>{verificationResult.disbursement.status}</span>
+                  </div>
+                  <div className={s.resultRow}>
+                    <span>Payout:</span>
+                    <span className={s.resultVal}>{verificationResult.disbursement.payout_percentage}%</span>
                   </div>
                 </div>
-              )}
-            </div>
-            <div className={s.buttonBox}>
-              <button onClick={decrementStep} className="button-solid">
-                Previous
+
+                <div className={s.aiAnalysis}>
+                  <h3>AI Analysis Explanation</h3>
+                  <div className={s.analysisText}>
+                    {verificationResult.analysis_explanation}
+                  </div>
+                </div>
+
+                <div className={s.actionBox}>
+                  <Link href="/dashboard" className="button-solid">Back to Portfolio</Link>
+                  <button onClick={() => setShowRaw(!showRaw)} className={s.toggleRaw}>
+                    {showRaw ? "Hide Raw AI Output" : "Show Raw AI Output"}
+                  </button>
+                </div>
+
+                {showRaw && (
+                  <div className={s.rawOutput}>
+                    <pre>{JSON.stringify(verificationResult, null, 2)}</pre>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p>Failed to retrieve verification result. Please check your dashboard.</p>
+            )}
+          </div>
+        )}
+      <div className={s.buttonBox}>
+        {step < 3 && (
+          <>
+            <button onClick={decrementStep} className="button-solid">
+              Previous
+            </button>
+            {step === 2 ? (
+              <button 
+                onClick={handleSubmit} 
+                className="button-solid" 
+                disabled={!image || isSubmitting}
+              >
+                {isSubmitting ? "Submitting..." : "Submit Claim"}
               </button>
-              <button onClick={incrementStep} className="button-solid">
+            ) : (
+              <button 
+                onClick={incrementStep} 
+                className="button-solid" 
+                disabled={step === 0 && !disaster || step === 1 && !impact}
+              >
                 Next
               </button>
-            </div>
-          </div>
-        </div>
-    </main>
-    
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  </div>
+  </>
   )
 }
 

@@ -1,4 +1,4 @@
-import { PDLEngine, ClaimManifest } from "./pdl-engine";
+import { PDLEngine, ClaimManifest } from "./verification";
 
 async function runTests() {
   const engine = new PDLEngine();
@@ -7,7 +7,12 @@ async function runTests() {
   const tier1Manifest: ClaimManifest = {
     claim_id: "PDL-2026-001",
     submission_date: "2026-03-07T21:42:07Z",
-    disaster_event_id: "SG-FLOOD-05",
+    disaster_info: {
+      name: "Central District Flash Flood",
+      date: "2026-03-07",
+      details: "Heavy rainfall causing flash floods in Orchard area.",
+      location: "Singapore"
+    },
     title: "Central District Flash Flood Relief",
     description: "Immediate relief claim for flash flood impact.",
     amount_requested: 5000.00,
@@ -31,7 +36,12 @@ async function runTests() {
   const tier2Manifest: ClaimManifest = {
     claim_id: "PDL-2026-002",
     submission_date: "2026-03-07T21:50:00Z",
-    disaster_event_id: "SG-FLOOD-05",
+    disaster_info: {
+      name: "Central District Flash Flood",
+      date: "2026-03-07",
+      details: "Heavy rainfall causing flash floods in Orchard area.",
+      location: "Singapore"
+    },
     title: "Commuter Impact Allowance",
     description: "I was stranded at Orchard MRT during the flash flood.",
     amount_requested: 1000.00,
@@ -58,7 +68,11 @@ async function runTests() {
   const tier3Manifest: ClaimManifest = {
     claim_id: "PDL-2026-003",
     submission_date: "2026-03-07T22:00:00Z",
-    disaster_event_id: "UNKNOWN",
+    disaster_info: {
+      name: "UNKNOWN",
+      date: "2026-03-07",
+      details: "Bad things happened."
+    },
     title: "Vague Claim",
     description: "Bad things happened.",
     amount_requested: 100.00,

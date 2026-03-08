@@ -89,6 +89,21 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    // Request a separate non-interactive quote grant.
+    // Rafiki requires type:"quote" access for quote.create — the outgoing-payment token alone is not sufficient.
+    const quoteGrant = await client.grant.request(
+      { url: wallet.authServer },
+      {
+        access_token: {
+          access: [{ type: "quote", actions: ["create", "read"] }],
+        },
+      }
+    );
+    const quoteAccessToken = (quoteGrant as any).access_token?.value;
+    if (!quoteAccessToken) {
+      return NextResponse.json({ message: "Failed to obtain non-interactive quote grant" }, { status: 500 });
+    }
+
     const grantId = crypto.randomUUID();
 
     // Store the grant locally (legacy)
@@ -112,6 +127,7 @@ export async function GET(req: NextRequest) {
       amount: parseInt(amount),
       continueToken: grant.continue.access_token.value,
       continueUri: grant.continue.uri,
+      quoteAccessToken,
       status: "pending",
       createdAt: new Date().toISOString()
     };

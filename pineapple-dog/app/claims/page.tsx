@@ -133,8 +133,8 @@ export default function ClaimsDashboard() {
       });
 
       const data = await res.json();
-      if (data.payoutTriggered) {
-        alert("Wait! Enough community votes reached - payout has been triggered via ILP!");
+      if (data.consensusReached || data.payoutTriggered) {
+        alert("Success! Community consensus reached - this claim has been marked for disbursement!");
       }
     } catch (err) {
       console.error("Atomic transaction failed", err)

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "../../../lib/firebaseAdmin";
 import { PDLEngine, ClaimManifest } from "../../../lib/verification";
+import { VOTE_THRESHOLD } from "../../../src/utils/voting";
 
 /**
  * GET /api/claims?userId=xxx  — list impact claims
@@ -34,7 +35,7 @@ export async function GET(req: NextRequest) {
 
             // If it has enough votes but isn't disbursed yet, we trigger the disbursement flow.
             // We do this in an async background task so we don't block the GET response.
-            if (voteCount >= 5 && !isDisbursed && needsConsensus && claimId) {
+            if (voteCount >= VOTE_THRESHOLD && !isDisbursed && needsConsensus && claimId) {
                 (async () => {
                     try {
                         const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";

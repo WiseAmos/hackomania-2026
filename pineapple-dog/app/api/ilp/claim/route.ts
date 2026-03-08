@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
                 const sourceWallet = await client.walletAddress.get({ url: poolEntry.walletUrl });
 
                 const quote = await client.quote.create(
-                    { url: sourceWallet.resourceServer, accessToken: poolEntry.continueToken },
+                    { url: sourceWallet.resourceServer, accessToken: poolEntry.accessToken },
                     {
                         walletAddress: sourceWallet.id,
                         receiver: claimantWalletInfo.id,
@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
                 );
 
                 await client.outgoingPayment.create(
-                    { url: sourceWallet.resourceServer, accessToken: poolEntry.continueToken },
+                    { url: sourceWallet.resourceServer, accessToken: poolEntry.accessToken },
                     { walletAddress: sourceWallet.id, quoteId: quote.id }
                 );
 

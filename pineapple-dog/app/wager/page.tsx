@@ -12,6 +12,7 @@ import {
     Loader2,
     Zap,
 } from "lucide-react";
+import { PoolDisplay } from "@/components/PoolDisplay";
 import Link from "next/link";
 import { useAuth } from "../../lib/AuthContext";
 
@@ -256,6 +257,9 @@ export default function WagerPage() {
                     <span className="font-[family-name:var(--font-heading)] font-bold text-lg">
                         {challengeType === "global" ? "Global Arena" : "Direct Showdown"}
                     </span>
+                </div>
+                <div className="hidden sm:block">
+                  <PoolDisplay />
                 </div>
             </nav>
 

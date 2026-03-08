@@ -7,6 +7,7 @@ import { useAuth } from "../../lib/AuthContext";
 import { ref, update } from "firebase/database";
 import { db } from "../../lib/firebase";
 import { Loader2, ArrowRight, Check, User, Home, DollarSign, Calendar, Landmark, CreditCard, Upload, LogOut } from "lucide-react";
+import { PoolDisplay } from "@/components/PoolDisplay";
 
 const steps = [
   { id: 1, title: "Personal Details", icon: User },
@@ -137,7 +138,10 @@ export default function OnboardingPage() {
   return (
     <main className="min-h-screen bg-[#0F172A] text-white flex flex-col items-center justify-center p-6 relative overflow-hidden">
       {/* Sign Out Button - Top Right */}
-      <div className="absolute top-6 right-6 z-[100]">
+      <div className="absolute top-6 right-6 z-[100] flex items-center gap-4">
+        <div className="hidden sm:block">
+          <PoolDisplay />
+        </div>
         <button 
           onClick={handleSignOut}
           className="flex items-center gap-2 px-4 py-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-all text-xs font-bold border border-transparent hover:border-white/10"

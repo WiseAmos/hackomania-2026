@@ -4,6 +4,7 @@ import { ArrowLeft, Clock, ThumbsUp, X, MapPin, Calendar, FileText, Info, Shield
 import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
 import { useAuth } from "../../lib/AuthContext"
+import { PoolDisplay } from "@/components/PoolDisplay"
 import { db } from "../../lib/firebase"
 import { ref, onValue, runTransaction } from "firebase/database"
 import { ClaimManifest, UnifiedResponse } from "../../lib/verification"
@@ -175,6 +176,9 @@ export default function ClaimsDashboard() {
           <ArrowLeft className="w-4 h-4" />
           <span className="text-sm font-medium">Back to Dashboard</span>
         </Link>
+        <div className="hidden sm:block mx-4">
+          <PoolDisplay />
+        </div>
         <div className="flex items-center gap-4">
           <Link href="/claims/submit" className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium transition-colors border border-white/5">
             Submit New Claim

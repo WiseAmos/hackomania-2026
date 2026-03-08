@@ -262,13 +262,20 @@ export default function ClaimsClientPage() {
                   <div className="flex flex-col items-center gap-6 w-full">
                     {verificationResult.validator_data && (
                       <div className="w-full bg-slate-800/80 rounded-2xl p-6 border border-white/5 shadow-xl mb-4">
-                        <h3 className={`text-center font-bold text-lg mb-6 ${verificationResult.validator_data.verification_anchor.disaster_verified ? 'text-[#10B981]' : 'text-[#EF4444]'}`}>
-                          {verificationResult.validator_data.verification_anchor.disaster_verified ? '✓ Disaster Verified' : '❌ Disaster Not Found'}
-                        </h3>
+                        <div className="flex flex-col items-center mb-6">
+                          <h3 className={`font-bold text-lg ${verificationResult.validator_data.verification_anchor.disaster_verified ? 'text-[#10B981]' : 'text-[#EF4444]'}`}>
+                            {verificationResult.validator_data.verification_anchor.disaster_verified ? '✓ Event Validated' : '❌ Event Not Found'}
+                          </h3>
+                          {verificationResult.validator_data.verification_anchor.incident_scale && (
+                            <span className="mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#6366F1]/20 text-[#6366F1] border border-[#6366F1]/30">
+                              {verificationResult.validator_data.verification_anchor.incident_scale} INCIDENT MODE
+                            </span>
+                          )}
+                        </div>
                         
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                           <div className="flex flex-col items-center gap-3">
-                            <div className="text-xs font-bold text-slate-400 uppercase tracking-widest text-center h-8 flex items-end justify-center">IoT Sensors<br/>(Weather/Seismic)</div>
+                            <div className="text-xs font-bold text-slate-400 uppercase tracking-widest text-center h-8 flex items-end justify-center">Local / Environmental<br/>Sensors</div>
                             <div className={`w-16 h-16 rounded-full border-[3px] flex items-center justify-center bg-black/40 ${verificationResult.validator_data.verification_anchor.data_sources.iot_sensor_match === 'PASS' ? 'border-[#10B981] shadow-[0_0_15px_rgba(16,185,129,0.3)]' : 'border-[#EF4444] shadow-[0_0_15px_rgba(239,68,68,0.3)]'}`}>
                               <span className={`text-sm font-bold ${verificationResult.validator_data.verification_anchor.data_sources.iot_sensor_match === 'PASS' ? 'text-[#10B981]' : 'text-[#EF4444]'}`}>
                                 {verificationResult.validator_data.verification_anchor.data_sources.iot_sensor_match}

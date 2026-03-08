@@ -8,7 +8,7 @@ export function calculateVotingPower(
 ): number {
   let S_i = 0;
   wagers.forEach(wager => {
-    if (wager.player1.uid === userId) {
+    if (wager.player1?.uid === userId) {
       S_i += wager.player1.stakedAmount || 0;
     } else if (wager.player2?.uid === userId) {
       S_i += wager.player2.stakedAmount || 0;
@@ -16,14 +16,17 @@ export function calculateVotingPower(
   });
 
   const P = stats.totalValueLocked || 1;
+  const baseline = 3;
 
-  // Total available votes is proportionate to the user's stake in the platform
-  // We use ceil to ensure that even small stakeholders get at least 1 vote if the ratio is positive.
-  const ratio = S_i / P;
+  // Additional voting power is proportionate to the user's stake in the platform
+  // ratio * 10 means if you own 10% of TVL, you get 1 extra vote.
+  // We use ceil to ensure any stake gives at least 1 extra vote.
+  const additionalPower = S_i > 0 ? Math.ceil((S_i / P) * numClaims) : 0;
 
-  // Voting power should be at least 1 if you have any stake and there are claims, 
-  // but capped at the total number of claims available.
-  const power = Math.ceil(ratio * numClaims);
-  console.log(Math.min(power, numClaims))
-  return Math.min(power, numClaims);
+  const totalPower = baseline + additionalPower;
+
+  // Cap it reasonably at numClaims or baseline + something large
+  return Math.min(totalPower, numClaims > 0 ? numClaims : baseline);
 }
+
+export const VOTE_THRESHOLD = 5;

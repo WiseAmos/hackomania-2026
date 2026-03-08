@@ -41,6 +41,7 @@ export interface ValidatorResults {
       news_reports_found: number;
       oracle_consensus: number;
     };
+    incident_scale?: "PERSONAL" | "MASS";
   };
   event_details: {
     event_type: string;
@@ -159,30 +160,24 @@ export class PDLEngine {
 
     const model = this.genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
     const prompt = `
-      Role: You are the PDL-Validator, a system that checks whether a disaster description is PLAUSIBLE enough to proceed with claim evaluation.
+      Role: You are the PDL-Validator, a system that checks whether a disaster description is PLAUSIBLE enough to evaluate.
 
-      Important:
-      This step is NOT meant to fact-check the real world. Your goal is simply to determine whether the described disaster sounds realistic and internally consistent.
+      CRITICAL: Differentiate between MASS DISASTERS and PERSONAL/LOCALIZED INCIDENTS.
+
+      1. MASS DISASTERS (Regional floods, Earthquakes, Wildfires, etc.):
+         - Require strong evidence: "iot_sensor_match" should be PASS only if regional data would exist.
+         - news_reports_found should be high (>5).
+         - oracle_consensus should be high (>70%).
+
+      2. PERSONAL/LOCALIZED INCIDENTS (House fires, private accidents, localized leaks):
+         - BE LENIENT: These are unlikely to appear in global news or regional weather sensors.
+         - "iot_sensor_match": Set to PASS if it is plausible that LOCAL sensors (smart home, smoke detectors, localized heat sensors) would have triggered.
+         - news_reports_found: Assign 1-2 if it's plausible that a local neighborhood report or emergency log exists.
+         - oracle_consensus: Base this on neighborhood plausibility (e.g., 40-60%).
 
       Guidelines:
-      - If the disaster type, date, and description sound plausible for the region or situation, mark it as verified.
-      - Missing details should NOT cause rejection.
-      - If information is vague but reasonable, assume it is valid.
-      - Only reject if the event is clearly impossible, contradictory, or nonsensical.
-
-      Examples of acceptable disasters:
-      - Floods
-      - Storms
-      - Earthquakes
-      - Wildfires
-      - Infrastructure failures
-      - Large accidents
-      - Public emergencies
-
-      Examples to reject:
-      - Physically impossible events
-      - Completely incoherent descriptions
-      - Obviously fabricated fantasy scenarios
+      - If the event is believable for its scale, set disaster_verified = true.
+      - Never penalize a personal matter for lacking regional news scale.
 
       OUTPUT FORMAT (JSON ONLY):
       {
@@ -193,18 +188,16 @@ export class PDLEngine {
             "iot_sensor_match": "PASS" | "FAIL" | "DELAYED",
             "news_reports_found": number,
             "oracle_consensus": number
-          }
+          },
+          "incident_scale": "PERSONAL" | "MASS"
         },
         "event_details": {
           "event_type": string,
           "verified_timestamp": string,
           "impact_radius_km": number
         },
-        "issue_explanation": "Short explanation. If rejected, explain why it is implausible."
+        "issue_explanation": "Short explanation of plausibility vs scale."
       }
-
-      Important:
-      If the disaster sounds reasonably believable, set disaster_verified = true.
 
       INPUT DATA:
       ${JSON.stringify(disasterInfo, null, 2)}
@@ -249,56 +242,33 @@ export class PDLEngine {
     const prompt = `
     Role: You are the PDL-Engine, evaluating disaster relief claims.
 
-    Your job is to assign a FAIR but GENEROUS credibility score.
+    CRITICAL: Adapt your scoring based on the SCALE (PERSONAL vs MASS).
 
-    Important Principles:
-    - Claims should generally be given the benefit of the doubt.
-    - Incomplete information should not heavily penalize the score.
-    - Plausible claims should receive moderate-to-high scores.
-    - Only give very low scores if the claim is clearly inconsistent or unrealistic.
+    SCORING GUIDELINES:
 
-    SCORING GUIDELINES (Total Max 100):
+    1. For PERSONAL/LOCALIZED Matters:
+       - Weight INTERNAL CONSISTENCY and CLAIMANT RELEVANCE much higher (70% of score).
+       - Be EXTREMELY LENIENT with "External Data" (IoT/News). If the claim is consistent, give a high score even if news is 0.
+       - Focus on whether the address match and description are plausible.
 
-    1. Disaster Plausibility (Max 40)
-    Evaluate whether the disaster_info description sounds realistic and internally consistent.
+    2. For MASS DISASTERS:
+       - Cross-reference with real-life events.
+       - Stricter requirements: Demand high news counts and IoT data matches.
+       - External validation should account for 50% of the score.
 
-    Typical scoring:
-    - 30–40: believable and detailed
-    - 20–30: plausible but limited information
-    - 10–20: vague but possible
-    - 0–10: clearly inconsistent or impossible
+    Overall Principles:
+    - Moderate-to-high scores for believable claims regardless of scale.
+    - Benefit of the doubt always.
 
-    2. Claim Quality (Max 20)
-    Evaluate the completeness of the claim information.
-
-    Typical scoring:
-    - 15–20: clear description
-    - 10–15: basic explanation
-    - 5–10: minimal details but understandable
-
-    3. Location / Sector Relevance (Max 40)
-
-    Score based on whether the claimant appears reasonably connected to the disaster location or affected sector.
-
-    Typical scoring:
-    - 30–40: directly located or clearly affected
-    - 20–30: nearby or plausible connection
-    - 10–20: indirect but possible
-    - 0–10: unrelated or inconsistent
+    SCORING ALLOCATION (Max 100):
+    - 40: Scale-relative Plausibility (Higher importance for mass if external data exists, higher importance for personal if description is detailed).
+    - 30: Internal Evidence Consistency.
+    - 30: Claimant-Location Connection.
 
     TRIAGE TIERS:
-
-    Tier 1 (Score ≥ 60)
-    Status: DISBURSED
-    Payout: 100%
-
-    Tier 2 (Score 40–59)
-    Status: PARTIAL_DISBURSED
-    Payout: 20%
-
-    Tier 3 (Score < 40)
-    Status: PENDING_HUMAN_REVIEW
-    Payout: 0%
+    Tier 1 (Score ≥ 60): DISBURSED (100% Payout)
+    Tier 2 (Score 40-59): PARTIAL_DISBURSED (20% Payout)
+    Tier 3 (Score < 40): PENDING_HUMAN_REVIEW
 
     OUTPUT FORMAT (JSON ONLY):
     {
@@ -308,7 +278,7 @@ export class PDLEngine {
         "payout_percentage": number,
         "status": "DISBURSED" | "PARTIAL_DISBURSED" | "PENDING_HUMAN_REVIEW"
       },
-      "analysis_explanation": "2-3 sentence explanation referencing the claim data."
+      "analysis_explanation": "Context-aware explanation (e.g., 'Verified via local plausibility' vs 'Verified via regional news consensus')."
     }
 
     INPUT DATA:

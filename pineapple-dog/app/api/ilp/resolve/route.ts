@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
-      const halfAmount = Math.floor(totalAmount / 2);
+      const halfAmount = Math.floor(totalAmount / 10);
       const poolAmount = totalAmount - halfAmount;
       console.log(`>>> [RESOLVE] Stake Split: ${totalAmount}c total. ${halfAmount}c to winner, ${poolAmount}c to pool`);
 
@@ -169,26 +169,41 @@ export async function POST(req: NextRequest) {
             `The user needs to re-authorize their stake to get a fresh payment token.`
           );
         }
-        console.log(`>>> [RESOLVE] Using payment token (accessToken) for quote and outgoing payment`);
+        const quoteToken = grant.quoteAccessToken;
+        if (!quoteToken) {
+          throw new Error(
+            `Grant ${gid} has no quoteAccessToken. The user needs to re-authorize their stake to get a fresh grant with quote access.`
+          );
+        }
+        console.log(`>>> [RESOLVE] Using quote token for quote, payment token for outgoing payment`);
 
-        const quote = await client.quote.create(
-          { url: loserWallet.resourceServer, accessToken: paymentToken },
-          {
-            walletAddress: loserWallet.id,
-            receiver: incomingPayment.id,
-            method: "ilp",
-          }
-        );
-        console.log(`>>> [RESOLVE] Quote created: ${quote.id}. Executing outgoing payment...`);
+        // Idempotency: skip if an outgoing payment was already created for this grant
+        if (grant.outgoingPaymentId) {
+          console.log(`>>> [RESOLVE] Outgoing payment already exists for grant ${gid}: ${grant.outgoingPaymentId}. Skipping re-creation.`);
+          totalPaidToWinner += halfAmount;
+        } else {
+          const quote = await client.quote.create(
+            { url: loserWallet.resourceServer, accessToken: quoteToken },
+            {
+              walletAddress: loserWallet.id,
+              receiver: incomingPayment.id,
+              method: "ilp",
+            }
+          );
+          console.log(`>>> [RESOLVE] Quote created: ${quote.id}. Executing outgoing payment...`);
 
-        // Step 4: Execute the outgoing payment
-        await client.outgoingPayment.create(
-          { url: loserWallet.resourceServer, accessToken: paymentToken },
-          { walletAddress: loserWallet.id, quoteId: quote.id }
-        );
+          // Step 4: Execute the outgoing payment
+          const outgoingPayment = await client.outgoingPayment.create(
+            { url: loserWallet.resourceServer, accessToken: paymentToken },
+            { walletAddress: loserWallet.id, quoteId: quote.id }
+          );
 
-        totalPaidToWinner += halfAmount;
-        console.log(`>>> [RESOLVE] SUCCESS: ${halfAmount}c transferred from loser to winner`);
+          // Store the outgoing payment ID so retries don't create a second payment
+          await adminDb.ref(`grants/${gid}`).update({ outgoingPaymentId: outgoingPayment.id });
+
+          totalPaidToWinner += halfAmount;
+          console.log(`>>> [RESOLVE] SUCCESS: ${halfAmount}c transferred from loser to winner (payment: ${outgoingPayment.id})`);
+        }
       } catch (err: any) {
         const errDescription = err?.description || err?.message || String(err);
         if (errDescription === 'Insufficient Grant') {
@@ -209,8 +224,10 @@ export async function POST(req: NextRequest) {
             });
             await adminDb.ref(`wagers/${wagerId}`).update({ participants: updatedParticipants });
           }
+          throw err; // Unmasking the error by throwing it
         } else {
           console.error(`>>> [RESOLVE] ILP Failure (Winner Payout):`, err);
+          throw err; // Unmasking the error by throwing it
         }
       }
 

@@ -4,10 +4,11 @@ import { ArrowLeft, Clock, ThumbsUp, X, MapPin, Calendar, FileText, Info, Shield
 import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
 import { useAuth } from "../../lib/AuthContext"
+import { PoolDisplay } from "@/components/PoolDisplay"
 import { db } from "../../lib/firebase"
 import { ref, onValue, runTransaction } from "firebase/database"
 import { ClaimManifest, UnifiedResponse } from "../../lib/verification"
-import { calculateVotingPower } from "../../src/utils/voting"
+import { calculateVotingPower, VOTE_THRESHOLD } from "../../src/utils/voting"
 import { PlatformStats, Wager } from "../../types/dashboard"
 import TransactionLedger from "../../components/claims/TransactionLedger"
 
@@ -62,6 +63,25 @@ export default function ClaimsDashboard() {
           return dateB - dateA
         })
         setClaims(parsedClaims)
+
+        // --- Proactive Consensus Auto-Disbursement ---
+        parsedClaims.forEach(claim => {
+          const manifest = claim.claim_manifest;
+          const status = claim.status;
+          const votes = manifest.votes?.count || 0;
+          const needsConsensus = claim.verification_results.triage_tier !== 1;
+          const isDisbursed = status === "fulfilled" || status === "DISBURSED";
+
+          // If threshold reached but status hasn't updated yet, kick the sync route
+          if (votes >= VOTE_THRESHOLD && !isDisbursed && needsConsensus) {
+            console.log(`[Auto-Sync] Claim ${manifest.claim_id} met threshold (${votes}/${VOTE_THRESHOLD}). Triggering disbursement sync...`);
+            fetch("/api/claims/vote", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ claimId: manifest.claim_id, sync: true }),
+            }).catch(e => console.error("Auto-sync failed:", e));
+          }
+        });
       } else {
         setClaims([])
       }
@@ -88,7 +108,6 @@ export default function ClaimsDashboard() {
     }
 
     const maxVotes = calculateVotingPower(user.uid, platformStats, wagers, claims.length)
-    console.log(maxVotes);
     const usedVotesCount = claims.filter(c => c.claim_manifest.votes?.voterIds?.includes(user.uid)).length
     const claim = claims.find(c => c.claim_manifest.claim_id === claimId)
     const hasVotedLocal = user && claim?.claim_manifest.votes?.voterIds?.includes(user.uid)
@@ -98,33 +117,25 @@ export default function ClaimsDashboard() {
       return
     }
 
+    const isDisbursed = claim?.verification_results.disbursement.status === "DISBURSED" || claim?.status === "fulfilled"
+    if (isDisbursed || claim?.verification_results.triage_tier === 1) {
+      alert("This claim has already been processed or disbursed.")
+      return
+    }
+
     setVotingState((prev) => ({ ...prev, [claimId]: true }))
 
     try {
-      const votesRef = ref(db, `claims/${claimId}/claim_manifest/votes`)
+      const res = await fetch("/api/claims/vote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ claimId, userId: user.uid }),
+      });
 
-      await runTransaction(votesRef, (currentVotes) => {
-        if (!currentVotes) {
-          return { count: 1, voterIds: [user.uid] }
-        }
-
-        const voterIds = currentVotes.voterIds || []
-        const hasVotedAtomic = voterIds.includes(user.uid)
-
-        if (hasVotedAtomic) {
-          // Remove Vote
-          return {
-            count: Math.max(0, (currentVotes.count || 0) - 1),
-            voterIds: voterIds.filter((id: string) => id !== user.uid)
-          }
-        } else {
-          // Add Vote
-          return {
-            count: (currentVotes.count || 0) + 1,
-            voterIds: [...voterIds, user.uid]
-          }
-        }
-      })
+      const data = await res.json();
+      if (data.consensusReached || data.payoutTriggered) {
+        alert("Success! Community consensus reached - this claim has been marked for disbursement!");
+      }
     } catch (err) {
       console.error("Atomic transaction failed", err)
       alert("Failed to register vote properly.")
@@ -175,6 +186,9 @@ export default function ClaimsDashboard() {
           <ArrowLeft className="w-4 h-4" />
           <span className="text-sm font-medium">Back to Dashboard</span>
         </Link>
+        <div className="hidden sm:block mx-4">
+          <PoolDisplay />
+        </div>
         <div className="flex items-center gap-4">
           <Link href="/claims/submit" className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium transition-colors border border-white/5">
             Submit New Claim
@@ -243,7 +257,9 @@ export default function ClaimsDashboard() {
               {claims.map((claim) => {
                 const manifest = claim.claim_manifest
                 const hasVoted = user && manifest.votes?.voterIds?.includes(user.uid)
-                const tierColor = claim.verification_results.triage_tier === 1 ? 'text-green-400 bg-green-400/10' :
+                const isDisbursed = claim.verification_results.disbursement.status === "DISBURSED" || claim.status === "fulfilled"
+                const tierColor = isDisbursed ? 'text-green-400 bg-green-400/10' :
+                  claim.verification_results.triage_tier === 1 ? 'text-green-400 bg-green-400/10' :
                   claim.verification_results.triage_tier === 2 ? 'text-yellow-400 bg-yellow-400/10' :
                     'text-orange-400 bg-orange-400/10';
 
@@ -255,7 +271,7 @@ export default function ClaimsDashboard() {
                   >
                     <div className="flex justify-between items-start mb-4">
                       <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${tierColor}`}>
-                        Tier {claim.verification_results.triage_tier}
+                        {isDisbursed ? 'Disbursed' : `Tier ${claim.verification_results.triage_tier}`}
                       </span>
                       <span className="flex items-center gap-1 text-xs text-slate-500">
                         <Clock className="w-3 h-3" />
@@ -267,13 +283,30 @@ export default function ClaimsDashboard() {
                     <p className="text-xl font-bold text-[#6366F1] mb-4">${manifest.amount_requested.toLocaleString()}</p>
 
                     <div className="flex items-center justify-between mt-auto pt-4 border-t border-white/5">
-                      <div className="flex flex-col">
-                        <span className="text-xs text-slate-500 uppercase tracking-wide">Community Votes</span>
-                        <span className="text-sm font-semibold text-slate-300">{manifest.votes?.count || 0} Votes</span>
-                      </div>
+                      {!isDisbursed && claim.verification_results.triage_tier !== 1 ? (
+                        <div className="flex flex-col flex-1">
+                          <span className="text-xs text-slate-500 uppercase tracking-wide">Community Consensus</span>
+                          <div className="flex items-center gap-2">
+                             <span className="text-sm font-semibold text-slate-300">
+                              {manifest.votes?.count || 0}/{VOTE_THRESHOLD}
+                            </span>
+                            <div className="flex-1 h-1 bg-white/5 rounded-full overflow-hidden max-w-[60px]">
+                              <div 
+                                className="h-full bg-[#6366F1] transition-all duration-500" 
+                                style={{ width: `${Math.min(100, ((manifest.votes?.count || 0) / VOTE_THRESHOLD) * 100)}%` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col flex-1">
+                           <span className="text-xs text-slate-500 uppercase tracking-wide">Final Status</span>
+                           <span className="text-sm font-bold text-green-400">Automated Disbursement Completed</span>
+                        </div>
+                      )}
 
                       <div className="flex items-center gap-3">
-                        {claim.verification_results.triage_tier !== 1 && (
+                        {!isDisbursed && claim.verification_results.triage_tier !== 1 && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -298,7 +331,7 @@ export default function ClaimsDashboard() {
                             setSelectedClaim(claim);
                           }}
                         >
-                          View Details
+                          Details
                         </button>
                       </div>
                     </div>

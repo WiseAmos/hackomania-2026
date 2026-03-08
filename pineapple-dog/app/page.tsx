@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { ArrowRight, Wallet, Activity, ShieldCheck, Map, Users, Anchor, CheckCircle } from "lucide-react";
 import Link from "next/link";
 import { AuthModal } from "../components/auth/AuthModal";
+import { PoolDisplay } from "../components/PoolDisplay";
 
 // ----------------------------------------------------------------------
 // COMPONENTS
@@ -28,6 +29,9 @@ function NavBar({ isScrolled, onOpenAuth }: { isScrolled: boolean; onOpenAuth: (
 
         {/* Actions */}
         <div className="flex items-center gap-3 sm:gap-6">
+          <div className="hidden sm:block">
+            <PoolDisplay />
+          </div>
           <button 
             onClick={onOpenAuth} 
             className="text-xs sm:text-sm font-medium text-white/60 hover:text-white transition-colors duration-300"

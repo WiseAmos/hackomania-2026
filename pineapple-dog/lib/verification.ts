@@ -64,6 +64,8 @@ export interface VerificationResults {
 export interface UnifiedResponse {
   claim_manifest: ClaimManifest;
   verification_results: VerificationResults;
+  status?: string;
+  updated_at?: string;
 }
 
 import { GoogleGenerativeAI } from "@google/generative-ai";

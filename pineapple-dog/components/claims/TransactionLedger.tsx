@@ -42,13 +42,13 @@ export default function TransactionLedger() {
           .map(([id, val]: [string, any]) => {
             const status = val.verification_results?.disbursement?.status || val.status;
             const isPaid = ["DISBURSED", "PARTIAL_DISBURSED", "fulfilled", "partial"].includes(status);
-            
+
             if (!isPaid) return null;
 
             return {
               id,
               type: "payout",
-              amount: val.claim_manifest?.amount_requested || val.amount || 0,
+              amount: val.amountPaid || val.claim_manifest?.amount_requested || val.amount || 0,
               description: val.claim_manifest?.title || val.wagerTitle || "Claim Payout",
               timestamp: val.updated_at || val.timestamp || new Date().toISOString(),
               status: status,
@@ -114,6 +114,13 @@ export default function TransactionLedger() {
       combineAndSort();
     });
 
+    // const combineAndSort = () => {
+    //   const combined = [...claimsData, ...grantsData];
+    //   combined.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    //   setTransactions(combined);
+    //   setLoading(false);
+    // };
+
     return () => {
       unsubscribeClaims();
       unsubscribeGrants();
@@ -154,11 +161,10 @@ export default function TransactionLedger() {
                 <tr key={tx.id} className="group hover:bg-white/[0.02] transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg ${
-                        tx.type === 'payout' ? 'bg-orange-500/10' : 
-                        tx.type === 'stake' ? 'bg-indigo-500/10' : 
-                        'bg-green-500/10'
-                      }`}>
+                      <div className={`p-2 rounded-lg ${tx.type === 'payout' ? 'bg-orange-500/10' :
+                        tx.type === 'stake' ? 'bg-indigo-500/10' :
+                          'bg-green-500/10'
+                        }`}>
                         {tx.type === 'payout' ? (
                           <ArrowUpRight className="w-4 h-4 text-orange-400" />
                         ) : tx.type === 'stake' ? (
@@ -174,20 +180,18 @@ export default function TransactionLedger() {
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${
-                      tx.type === 'payout' ? 'text-orange-400 bg-orange-400/10' : 
-                      tx.type === 'stake' ? 'text-indigo-400 bg-indigo-400/10' : 
-                      'text-green-400 bg-green-400/10'
-                    }`}>
+                    <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${tx.type === 'payout' ? 'text-orange-400 bg-orange-400/10' :
+                        tx.type === 'stake' ? 'text-indigo-400 bg-indigo-400/10' :
+                          'text-green-400 bg-green-400/10'
+                      }`}>
                       {tx.type === 'payout' ? 'Payout' : tx.type === 'stake' ? 'Stake' : 'Refill'}
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    <p className={`text-sm font-bold ${
-                      tx.type === 'payout' ? 'text-slate-200' : 
-                      tx.type === 'stake' ? 'text-indigo-400' : 
-                      'text-green-400'
-                    }`}>
+                    <p className={`text-sm font-bold ${tx.type === 'payout' ? 'text-slate-200' :
+                      tx.type === 'stake' ? 'text-indigo-400' :
+                        'text-green-400'
+                      }`}>
                       {tx.type === 'payout' ? '-' : tx.type === 'stake' ? '•' : '+'}${tx.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
                   </td>
@@ -209,7 +213,7 @@ export default function TransactionLedger() {
           </tbody>
         </table>
       </div>
-      
+
       <div className="mt-6 flex flex-col sm:flex-row gap-4">
         <div className="flex-1 p-4 rounded-2xl bg-slate-800/40 border border-white/5 backdrop-blur-sm">
           <p className="text-xs text-slate-500 uppercase font-bold tracking-wider mb-1">Total Disbursed</p>

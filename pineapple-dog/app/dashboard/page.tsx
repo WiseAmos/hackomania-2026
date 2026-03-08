@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Award, Loader2, User, Plus, LogOut, Users } from "lucide-react";
+import { PoolDisplay } from "@/components/PoolDisplay";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
@@ -217,6 +218,9 @@ export default function ArenaDashboardLayout() {
         </div>
 
         <div className="flex items-center gap-3 sm:gap-6">
+          <div className="hidden sm:block">
+            <PoolDisplay />
+          </div>
           <button
             onClick={() => setIsFriendsModalOpen(true)}
             className="hidden sm:flex items-center gap-2 bg-slate-800/50 hover:bg-slate-800 text-white/70 hover:text-white px-4 py-2.5 rounded-full font-bold text-xs sm:text-sm transition-all border border-white/5"

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../lib/AuthContext";
+import { PoolDisplay } from "@/components/PoolDisplay";
 import { ref, update } from "firebase/database";
 import { db } from "../../lib/firebase";
 import { 
@@ -128,6 +129,9 @@ export default function ProfilePage() {
           Back to Arena
         </Link>
         <h1 className="font-[family-name:var(--font-heading)] text-xl font-bold tracking-tight">User Profile</h1>
+        <div className="hidden sm:block">
+          <PoolDisplay />
+        </div>
         <button 
           onClick={handleSignOut}
           className="flex items-center gap-2 px-4 py-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-all text-xs font-bold border border-transparent hover:border-white/10"

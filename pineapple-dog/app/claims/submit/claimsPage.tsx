@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from "react"
 import s from "./claimsPage.module.css"
 import { ArrowLeft, BriefcaseBusiness, House, Locate, Loader2 } from 'lucide-react';
+import { PoolDisplay } from "@/components/PoolDisplay";
 import Link from "next/link";
 import { useAuth } from "@/lib/AuthContext"
 
@@ -122,7 +123,9 @@ export default function ClaimsClientPage() {
           <ArrowLeft className="w-4 h-4" />
           <span className="text-sm font-medium">Back to Dashboard</span>
         </Link>
-
+        <div className="hidden sm:block">
+          <PoolDisplay />
+        </div>
       </nav>
       <div className="flex flex-col items-center w-full max-w-2xl mx-auto mt-12 px-4 z-10 relative">
         <div className="bg-slate-800/80 backdrop-blur-xl border border-white/10 rounded-3xl p-6 sm:p-10 w-full shadow-2xl">

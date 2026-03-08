@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { Users, HandCoins, AlertCircle } from "lucide-react";
 import { useAuth } from "../../lib/AuthContext";
 import { ProofPost, Wager } from "../../types/dashboard";
-import { RaiseStakesModal } from "./RaiseStakesModal";
 import { ChallengeCard } from "./ChallengeCard";
 
 interface Props {

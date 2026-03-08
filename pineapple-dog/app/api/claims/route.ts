@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "../../../lib/firebaseAdmin";
 import { PDLEngine, ClaimManifest } from "../../../lib/verification";
+import { VOTE_THRESHOLD } from "../../../src/utils/voting";
 
 /**
  * GET /api/claims?userId=xxx  — list impact claims
@@ -18,9 +19,38 @@ export async function GET(req: NextRequest) {
             snap = await claimsRef.orderByChild("createdAt").limitToLast(50).once("value");
         }
 
-        const data: Record<string, unknown>[] = [];
-        snap.forEach((child) => {
-            data.push({ id: child.key, ...child.val() });
+        const data: any[] = [];
+        snap.forEach((child: any) => {
+            const claim = child.val();
+            const claimId = child.key;
+            
+            // --- Robust Community Consensus Auto-Disbursement ---
+            // If the claim is already community-verified (Threshold met) 
+            // but not yet marked fulfilled, we trigger the sync.
+            const voteCount = claim.claim_manifest?.votes?.count || 0;
+            const status = claim.status;
+            const triageTier = claim.verification_results?.triage_tier;
+            const needsConsensus = triageTier !== 1;
+            const isDisbursed = status === "fulfilled" || status === "DISBURSED";
+
+            // If it has enough votes but isn't disbursed yet, we trigger the disbursement flow.
+            // We do this in an async background task so we don't block the GET response.
+            if (voteCount >= VOTE_THRESHOLD && !isDisbursed && needsConsensus && claimId) {
+                (async () => {
+                    try {
+                        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+                        await fetch(`${baseUrl}/api/claims/vote`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ claimId, sync: true }),
+                        });
+                    } catch (e) {
+                         console.warn(`[Consensus Sync-Thread] Failed to auto-disburse verified claim ${claimId}:`, e);
+                    }
+                })();
+            }
+
+            data.push({ id: claimId, ...claim });
         });
 
         return NextResponse.json(data.reverse());
@@ -33,8 +63,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
-        const { 
-            userId, amount, description, reliefFund, wagerTitle, 
+        const {
+            userId, amount, description, reliefFund, wagerTitle,
             recipientName, recipientAvatar, recipientBio, claimantWallet,
             disaster_info, selected_category, category_details
         } = body;
@@ -49,11 +79,11 @@ export async function POST(req: NextRequest) {
         if (!userSnap.exists()) {
             return NextResponse.json({ error: "User not found" }, { status: 404 });
         }
-        
+
         const userData = userSnap.val();
         if (!userData.kycVerified) {
-            return NextResponse.json({ 
-                error: "KYC verification required to upload claims. Please complete your profile and upload identity documents." 
+            return NextResponse.json({
+                error: "KYC verification required to upload claims. Please complete your profile and upload identity documents."
             }, { status: 403 });
         }
 
@@ -68,6 +98,7 @@ export async function POST(req: NextRequest) {
                 avatar: recipientName?.charAt(0) || "R",
                 bio: recipientBio || "Providing aid to communities in need.",
             },
+            claimantWallet: claimantWallet || "",
             status: "verifying",
             grantsUsed: [],
             timestamp: new Date().toISOString(),
@@ -98,7 +129,7 @@ export async function POST(req: NextRequest) {
                 category_details: category_details || {},
                 votes: { count: 0, voterIds: [] }
             };
-            
+
             verificationResponse = await engine.processClaim(manifest);
             // Engine already updates the claim in DB via saveTokenToDb
         } catch (verifErr) {
@@ -107,24 +138,33 @@ export async function POST(req: NextRequest) {
         }
 
         // If verified (Tier 1 or 2) and a claimant wallet is provided, attempt ILP payout
-        const isVerified = verificationResponse?.verification_results.triage_tier === 1 || 
-                           verificationResponse?.verification_results.triage_tier === 2;
+        const payoutPercentage = verificationResponse?.verification_results.disbursement.payout_percentage || 0;
+        const isVerified = payoutPercentage > 0;
 
         if (isVerified && claimantWallet) {
             try {
+                // ILP expects cents. (dollars * percentage) is the correct cent amount if percentage is an integer 1-100.
+                const payoutAmountCents = Math.round(Number(amount) * payoutPercentage);
+                
                 const ilpRes = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/api/ilp/claim`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                         claimantWallet,
-                        amount: Math.round(Number(amount) * 100).toString(),
+                        amount: payoutAmountCents.toString(),
                         description: reliefFund,
                     }),
                 });
                 const ilpData = await ilpRes.json();
+                
+                // If it's a full payment (Tier 1), status is fulfilled.
+                // If it's a partial payment (Tier 2), status is partial.
+                const newStatus = ilpData.success ? (payoutPercentage >= 100 ? "fulfilled" : "partial") : "pending_payout";
+
                 await ref.update({ 
-                    status: ilpData.success ? "fulfilled" : "partial", 
-                    grantsUsed: ilpData.payments || [] 
+                    status: newStatus, 
+                    grantsUsed: ilpData.payments || [],
+                    amountPaid: ilpData.success ? (Number(amount) * payoutPercentage / 100) : 0
                 });
             } catch (ilpErr) {
                 console.error("[api/claims] ILP payout failed:", ilpErr);
@@ -132,14 +172,16 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // Update total relief paid stat if fulfilled or partial
+        // Update total relief paid stat if any amount was paid
         const finalSnap = await ref.once("value");
-        const finalStatus = finalSnap.val().status;
-        if (finalStatus === "fulfilled" || finalStatus === "partial" || finalStatus === "DISBURSED") {
+        const finalData = finalSnap.val();
+        const paidSoFar = finalData.amountPaid || 0;
+        
+        if (paidSoFar > 0) {
             const statsRef = adminDb.ref("pool/stats/totalReliefPaid");
             const statsSnap = await statsRef.once("value");
-            const currentPaid = statsSnap.val() || 0;
-            await statsRef.set(currentPaid + Number(amount));
+            const currentTotal = statsSnap.val() || 0;
+            await statsRef.set(currentTotal + paidSoFar);
         }
 
         return NextResponse.json({ id: claimId, ...claimData, verification: verificationResponse });

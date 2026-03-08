@@ -64,6 +64,13 @@ export default function ClaimsClientPage() {
 
   async function handleSubmit() {
     if (!user) return;
+
+    const claimantWallet = user.interledgerLink || user.walletAddress || "";
+    if (!claimantWallet) {
+      alert("Please set your Interledger wallet address in your Profile before submitting a claim.");
+      return;
+    }
+
     setIsSubmitting(true);
     setStep(3);
 
@@ -77,7 +84,7 @@ export default function ClaimsClientPage() {
           description: formData.description,
           reliefFund: formData.title || "Community Relief Claim",
           wagerTitle: formData.title || "Community Relief Claim",
-          claimantWallet: user.walletAddress || "test.wallet.near",
+          claimantWallet,
           disaster_info: {
             name: formData.title || "Unknown Incident",
             date: formData.disasterDate,

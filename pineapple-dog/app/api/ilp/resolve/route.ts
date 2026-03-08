@@ -240,6 +240,7 @@ export async function POST(req: NextRequest) {
           sourceWagerId: wagerId,
           amount: poolAmount,
           accessToken: grant.accessToken || "",
+          quoteAccessToken: grant.quoteAccessToken || "",
           continueToken: grant.continueToken,
           continueUri: grant.continueUri,
           interactRef: grant.interactRef,

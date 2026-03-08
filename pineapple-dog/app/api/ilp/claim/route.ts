@@ -72,8 +72,13 @@ export async function POST(req: NextRequest) {
             try {
                 const sourceWallet = await client.walletAddress.get({ url: poolEntry.walletUrl });
 
+                const quoteToken = poolEntry.quoteAccessToken || poolEntry.accessToken;
+                if (!poolEntry.quoteAccessToken) {
+                    console.warn(`[claim] Pool grant ${poolEntry.id} has no quoteAccessToken, falling back to accessToken`);
+                }
+
                 const quote = await client.quote.create(
-                    { url: sourceWallet.resourceServer, accessToken: poolEntry.accessToken },
+                    { url: sourceWallet.resourceServer, accessToken: quoteToken },
                     {
                         walletAddress: sourceWallet.id,
                         receiver: claimantWalletInfo.id,

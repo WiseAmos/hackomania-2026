@@ -72,6 +72,10 @@ export async function POST(req: NextRequest) {
             // Calculate remaining percentage to pay (e.g. 100 - 20 = 80 for Tier 2, or 100 - 0 = 100 for Tier 3)
             const remainingPercentage = 100 - currentPercentage;
 
+            // --- FORCE STATUS UPDATE REGARDLESS OF PAYOUT SUCCESS ---
+            // The user requested that passing the threshold should mark it as disbursed even if it "doesn't actually pass" (e.g. payout fails)
+            
+            let payoutError = null;
             if (claimantWallet && totalAmount && remainingPercentage > 0) {
                 try {
                     // Internal payout via ILP service
@@ -83,7 +87,6 @@ export async function POST(req: NextRequest) {
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
                             claimantWallet,
-                            // (Total Amount * Remaining%) in cents
                             amount: Math.round(Number(totalAmount) * remainingPercentage).toString(),
                             description: claim.reliefFund || "Community Consensus Verification Payment",
                         }),
@@ -93,46 +96,54 @@ export async function POST(req: NextRequest) {
                     
                     if (payoutResult.success || (payoutResult.totalPaid && payoutResult.totalPaid > 0)) {
                         payoutTriggered = true;
-                        
-                        // 3. Finalize Status across the board
-                        await claimRef.update({
-                            status: "fulfilled",
-                            updated_at: new Date().toISOString(),
-                            amountPaid: Number(totalAmount), // Fully paid now
-                            "verification_results/disbursement/status": "DISBURSED",
-                            "verification_results/disbursement/payout_percentage": 100,
-                            grantsUsed: [
-                                ...(claim.grantsUsed || []),
-                                ...(payoutResult.payments || [])
-                            ],
-                            consensusTimestamp: new Date().toISOString()
-                        });
-
-                        // 4. Update Platform Statistics
-                        const statsRef = adminDb.ref("pool/stats/totalReliefPaid");
-                        const statsSnap = await statsRef.once("value");
-                        const currentPaidValue = statsSnap.val() || 0;
-                        // Add the NEWLY paid amount
-                        const newlyPaid = (Number(totalAmount) * remainingPercentage) / 100;
-                        await statsRef.set(currentPaidValue + newlyPaid);
-
-                        console.log(`[Consensus Check] SUCCESS. Claim ${claimId} marked as DISBURSED.`);
+                        console.log(`[Consensus Check] ILP Payout Successful for ${claimId}`);
                     } else {
                         console.error(`[Consensus Check] ILP Payout reported failure:`, payoutResult);
+                        payoutError = payoutResult.error || "Payout failure";
                     }
                 } catch (dispatchErr) {
                     console.error("[Consensus Check] Failed to dispatch ILP request:", dispatchErr);
+                    payoutError = String(dispatchErr);
                 }
             } else {
-                console.warn(`[Consensus Check] Logic blocked. Reason: ${!claimantWallet ? 'Missing Wallet' : !totalAmount ? 'Missing Amount' : 'Zero Remaining Percentage'}. Wallet: ${claimantWallet}, Amount: ${totalAmount}, Remaining%: ${remainingPercentage}`);
+                console.warn(`[Consensus Check] Payout skipped. Wallet: ${claimantWallet}, Amount: ${totalAmount}, Remaining%: ${remainingPercentage}`);
             }
+
+            // Finalize Status across the board (Always do this if threshold reached)
+            await claimRef.update({
+                status: "fulfilled",
+                updated_at: new Date().toISOString(),
+                amountPaid: Number(totalAmount), // Mark as fully paid
+                "verification_results/disbursement/status": "DISBURSED",
+                "verification_results/disbursement/payout_percentage": 100,
+                grantsUsed: [
+                    ...(claim.grantsUsed || []),
+                    ...(payoutResult?.payments || [])
+                ],
+                consensusTimestamp: new Date().toISOString(),
+                payoutError: payoutError // Log the error if any, but keep status DISBURSED
+            });
+
+            // Update Platform Statistics (only if payout actually triggered)
+            if (payoutTriggered) {
+                const statsRef = adminDb.ref("pool/stats/totalReliefPaid");
+                const statsSnap = await statsRef.once("value");
+                const currentPaidValue = statsSnap.val() || 0;
+                const newlyPaid = (Number(totalAmount) * remainingPercentage) / 100;
+                await statsRef.set(currentPaidValue + newlyPaid);
+            }
+
+            console.log(`[Consensus Check] COMPLETED. Claim ${claimId} marked as DISBURSED.`);
         }
+
+        const consensusReached = voteCount >= VOTE_THRESHOLD && needsConsensus;
 
         return NextResponse.json({
             success: true,
             voteCount,
             payoutTriggered,
-            status: isDisbursed ? "DISBURSED" : "PENDING"
+            consensusReached,
+            status: isDisbursed || consensusReached ? "DISBURSED" : "PENDING"
         });
 
     } catch (err: any) {
